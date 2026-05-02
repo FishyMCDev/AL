@@ -1,0 +1,105 @@
+name: AvatarLegacy
+version: '1.0-BETA'
+main: fishy.avatarlegacy.AvatarLegacy
+api-version: '1.21'
+authors: [Fishy__MC]
+description: Complete Avatar Legacy server plugin (giggles)
+
+
+depend: [Vault, LuckPerms, WorldGuard, ProjectKorra]
+softdepend: [Citizens]
+
+commands:
+  elementtime:
+    description: Check time remaining before element becomes permanent
+    usage: /<command>
+
+  playtime:
+    description: View your total active playtime
+    usage: /<command>
+
+  xp:
+    description: View custom XP amount
+    usage: /<command>
+
+  admin:
+    description: Admin commands for AvatarLegacy
+    usage: /<command> <setxp|setplaytime|resetplayer|deletedata|setelement> [args]
+    permission: avatarlegacy.admin
+
+  shop:
+    description: Open the server shop GUI
+    usage: /<command>
+
+  balance:
+    description: Check your yen balance
+    usage: /<command>
+    aliases: [bal, money]
+
+  pay:
+    description: Send yen to another player
+    usage: /<command> <player> <amount>
+
+  treasury:
+    description: View nation treasury
+    usage: /<command>
+
+  economy:
+    description: Economy admin commands
+    usage: /<command> <give|take|set> <player> <amount>
+    permission: avatarlegacy.admin.economy
+
+  character:
+    description: Character management
+    usage: /<command> <create|delete|info>
+
+  characterwho:
+    description: View a player's character info
+    usage: /<command> <player>
+    aliases: [charwho]
+
+  stats:
+    description: View your stats and debuffs
+    usage: /<command> [restore|reset]
+
+  deaths:
+    description: View your total death count
+    usage: /<command>
+
+  nation:
+    description: Nation management commands
+    usage: /<command> <subcommand> [args]
+
+  avatar:
+    description: Avatar cycle commands
+    usage: /<command> <info|scores|set|setscore|reset|cycle|history>
+
+  xpconvert:
+    description: Convert Yen into custom XP
+    usage: /<command> [amount]
+
+  sellgui:
+    description: Open the quick-sell GUI to sell items fast
+    usage: /<command>
+    aliases: [sell, quicksell]
+
+permissions:
+  avatarlegacy.admin:
+    description: Full admin access
+    default: op
+
+  avatarlegacy.admin.economy:
+    description: Economy admin commands
+    default: op
+
+  avatarlegacy.nation.create:
+    description: Create nations
+    default: true
+
+  avatarlegacy.nation.leader:
+    description: Nation leader commands
+    default: false
+
+  avatarlegacy.avatar:
+    description: Avatar status
+    default: false

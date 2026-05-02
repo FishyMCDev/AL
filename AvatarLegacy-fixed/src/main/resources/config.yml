@@ -1,0 +1,226 @@
+database:
+  path: "plugins/AvatarLegacy/avatarlegacy.db"
+spawn-locations:
+  spawn-realm:
+    world: "world"
+    x: 0
+    y: 72
+    z: 0
+  fire-ruins:
+    world: "world"
+    x: 843
+    y: 119
+    z: 539
+  water-ruins:
+    world: "world"
+    x: 2898
+    y: 64
+    z: -1736
+  earth-ruins:
+    world: "world"
+    x: -346
+    y: 68
+    z: 1526
+  air-ruins:
+    world: "world"
+    x: 658
+    y: 109
+    z: 2735
+
+# AFK kicking is disabled, set to 0 to never kick
+afk:
+  kick-after-minutes: 0
+
+chi:
+  spawn-radius: 10000
+  spawn-world: "world"
+
+element-territories:
+  fire:
+    world: "world"
+    min-x: 900
+    max-x: 1100
+    min-z: -100
+    max-z: 100
+  water:
+    world: "world"
+    min-x: -1100
+    max-x: -900
+    min-z: -100
+    max-z: 100
+  earth:
+    world: "world"
+    min-x: -100
+    max-x: 100
+    min-z: 900
+    max-z: 1100
+  air:
+    world: "world"
+    min-x: -100
+    max-x: 100
+    min-z: -1100
+    max-z: -900
+
+scrolls:
+  unlock-count: 1
+  move-costs:
+    FireBlast: 1
+    FireJet: 1
+    FireShield: 1
+    Torrent: 1
+    WaterSpout: 1
+    Surge: 1
+    AirSuction: 3
+    AirSwipe: 1
+    Tornado: 3
+    EarthBlast: 1
+    Catapult: 1
+    Shockwave: 1
+    QuickStrike: 2
+    AcrobatStance: 3
+    Smokescreen: 5
+
+protected-default-moves:
+  fire: ["FireBlast", "FireJet", "FireShield"]
+  water: ["WaterManipulation", "WaterSpout", "Torrent"]
+  air: ["AirSpout", "AirSwipe", "AirBlast"]
+  earth: ["EarthBlast", "Catapult", "Shockwave"]
+  chi: ["QuickStrike", "SwiftKick", "HighJump"]
+
+element-selection:
+  timer-hours: 2
+  choose-cooldown-seconds: 60
+
+custom-xp:
+  per-kill: 1
+  per-death: -1
+  playtime-interval-minutes: 30
+  per-playtime-interval: 5
+
+xp-conversion:
+  yen-per-xp: 100
+
+currency:
+  name: "Yen"
+  symbol: "¥"
+  starting-balance: 1000
+
+shop:
+  gui-title: "Server Shop"
+  items:
+    wheat:
+      material: WHEAT
+      buy-price: 50
+      sell-price: 10
+      sellable: true
+    cobblestone:
+      material: COBBLESTONE
+      buy-price: 5
+      sell-price: 1
+      sellable: true
+    oak_log:
+      material: OAK_LOG
+      buy-price: 20
+      sell-price: 5
+      sellable: true
+    iron_ingot:
+      material: IRON_INGOT
+      buy-price: 200
+      sell-price: 50
+      sellable: true
+    diamond:
+      material: DIAMOND
+      buy-price: 1000
+      sell-price: 250
+      sellable: true
+
+transaction-logging: true
+death-logging: true
+
+character:
+  deletion-cooldown-days: 7
+  delete-items-on-deletion: true
+  death-ban-days: 1
+
+debuffs:
+  bending-strength-reduction-per-death: 5
+  minimum-bending-strength: 50
+  max-moves-removable: 5
+
+bending-spirit:
+  max-deaths: 30
+  restore-cost-xp: 5000
+  restore-cost-yen: 100000
+  max-restores: -1
+  restore-cooldown-hours: 24
+
+restoration:
+  bending-strength-restore-cost-xp: 100
+  bending-strength-restore-cost-yen: 50000
+  move-restore-cost-xp: 50
+  move-restore-cost-yen: 25000
+
+nation-creation:
+  costs:
+    wood-stacks: 5
+    cobblestone-stacks: 5
+    xp-levels: 5
+    playtime-minutes: 30
+  grace-period-days: 7
+
+core:
+  min-y-level: 62
+  max-distance-from-spawn: 10
+  max-underground-depth: 5
+  durability: 20
+  hit-reset-minutes: 10
+  shield-duration-minutes: 60
+  shield-cooldown-hours: 6
+
+citizenship:
+  kick-cooldown-minutes: 5
+
+taxes:
+  collection-time: "00:00"
+  max-rate-percent: 50
+
+claiming:
+  chunks-per-nation: 5
+  extra-chunks-per-upgrade: 2
+  cost-per-chunk: 5000
+  max-total-chunks: 15
+
+upgrades:
+  resource-drop-rate:
+    level-1-cost: 50000
+    level-2-cost: 100000
+    level-3-cost: 200000
+  citizen-strength:
+    level-1-cost: 75000
+    level-2-cost: 150000
+    level-3-cost: 300000
+  core-shield:
+    level-1-cost: 100000
+    level-2-cost: 200000
+    level-3-cost: 400000
+
+avatar:
+  cycle-order: ["fire", "air", "water", "earth"]
+  reincarnation-period-days: 7
+  global-debuff-during-reincarnation: 10
+  score:
+    playtime-cap-hours: 24
+  first-avatar:
+    min-playtime-hours: 5
+
+element-changer:
+  item-name: "&5&lElement Changer"
+  item-lore:
+    - "&7Right-click to change your permanent element."
+    - "&7One use only."
+  announce-change: true
+
+teleport:
+  delay-seconds: 10
+  cooldown-seconds: 10
+  command-cooldown-seconds: 5
