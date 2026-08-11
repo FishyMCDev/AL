@@ -1,0 +1,3 @@
+**The Official AvatarLegacy core plugin** 
+
+Read.md will be continued on soon...
