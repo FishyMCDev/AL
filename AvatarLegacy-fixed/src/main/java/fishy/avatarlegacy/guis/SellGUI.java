@@ -37,7 +37,7 @@ public class SellGUI implements Listener {
     public void openSellGUI(Player player) {
         
         if (plugin.getPlayerDataManager().getPlayerData(player.getUniqueId()) == null) {
-            player.sendMessage(MessageUtil.error("You need a character to use the shop!"));
+            player.sendMessage(MessageUtil.error("You need a loaded player profile to use the shop!"));
             return;
         }
 

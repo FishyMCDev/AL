@@ -84,16 +84,14 @@ public class MessageUtil {
     public static Component avatarDeathBroadcast(String playerName) {
         return Component.text("☠ ", NamedTextColor.DARK_RED, TextDecoration.BOLD)
                 .append(Component.text("The Avatar ", NamedTextColor.GOLD, TextDecoration.BOLD))
-                .append(Component.text(playerName, NamedTextColor.YELLOW, TextDecoration.BOLD))
-                .append(Component.text(" has fallen! ", NamedTextColor.GOLD, TextDecoration.BOLD))
+                .append(Component.text("has fallen! ", NamedTextColor.GOLD, TextDecoration.BOLD))
                 .append(Component.text("The world mourns...", NamedTextColor.GRAY));
     }
 
     public static Component avatarReincarnationBroadcast(String playerName, String element) {
         return Component.text("✦ ", NamedTextColor.GOLD, TextDecoration.BOLD)
-                .append(Component.text("A new Avatar has been chosen! ", NamedTextColor.GOLD, TextDecoration.BOLD))
-                .append(Component.text(playerName, NamedTextColor.YELLOW, TextDecoration.BOLD))
-                .append(Component.text(" of ", NamedTextColor.WHITE))
+                .append(Component.text("A new Avatar has been chosen. ", NamedTextColor.GOLD, TextDecoration.BOLD))
+                .append(Component.text("The cycle now rests with ", NamedTextColor.WHITE))
                 .append(elementColor(element, element.toUpperCase()).decorate(TextDecoration.BOLD))
                 .append(Component.text(" will restore balance!", NamedTextColor.WHITE));
     }

@@ -97,7 +97,7 @@ public class BlockBreakListener implements Listener {
             return;
         }
 
-        int maxDurability = plugin.getConfig().getInt("core.durability", 20);
+        int maxDurability = plugin.getNationManager().getCoreDurability(nationId);
         int hits = plugin.getNationManager().incrementCoreHits(nationId);
         String nationName = plugin.getNationManager().getNationName(nationId);
 

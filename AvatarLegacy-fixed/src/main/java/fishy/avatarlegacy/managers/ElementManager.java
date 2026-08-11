@@ -13,6 +13,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class ElementManager {
 
@@ -47,6 +48,7 @@ public class ElementManager {
         }
 
         plugin.getProjectKorraIntegration().setPlayerElement(player, element);
+        clearBendingSlots(player);
 
         if (oldElement != null && !oldElement.equalsIgnoreCase(element)) {
             
@@ -55,14 +57,8 @@ public class ElementManager {
             
             
             java.util.List<String> previouslyRemoved = plugin.getStatsManager().getRemovedMoves(player.getUniqueId());
-            if (plugin.getProjectKorraIntegration().isScrollsEnabled()) {
-                for (String m : previouslyRemoved) {
-                    plugin.getScrollManager().giveScrollForRestore(player, m);
-                }
-            } else {
-                for (String m : previouslyRemoved) {
-                    plugin.getLuckPermsIntegration().grantPermission(player.getUniqueId(), "bending.ability." + m.toLowerCase());
-                }
+            for (String m : previouslyRemoved) {
+                plugin.getLuckPermsIntegration().grantPermission(player.getUniqueId(), "bending.ability." + m.toLowerCase());
             }
             
             
@@ -181,6 +177,8 @@ public class ElementManager {
 
     private void teleportToRuins(Player player, String element) {
         if (element.equalsIgnoreCase("chi")) return; 
+        Location stored = getStoredSpawn(element);
+        if (stored != null) { player.teleport(stored); return; }
         String path = "spawn-locations." + element.toLowerCase() + "-ruins";
         ConfigurationSection config = plugin.getConfig().getConfigurationSection(path);
         if (config == null) return;
@@ -190,6 +188,31 @@ public class ElementManager {
         if (w == null) return;
         Location loc = new Location(w, config.getDouble("x"), config.getDouble("y"), config.getDouble("z"));
         player.teleport(loc);
+    }
+
+    public void setSpawn(String element, int slot, Location location) {
+        if (slot < 1 || slot > 3 || location == null || location.getWorld() == null) throw new IllegalArgumentException("slot must be 1-3");
+        try (PreparedStatement stmt = plugin.getDatabaseManager().getConnection().prepareStatement(
+                "INSERT INTO element_spawns (element, slot, world, x, y, z, yaw, pitch) VALUES (?, ?, ?, ?, ?, ?, ?, ?) " +
+                        "ON CONFLICT(element, slot) DO UPDATE SET world=excluded.world, x=excluded.x, y=excluded.y, z=excluded.z, yaw=excluded.yaw, pitch=excluded.pitch")) {
+            stmt.setString(1, element.toLowerCase()); stmt.setInt(2, slot); stmt.setString(3, location.getWorld().getName());
+            stmt.setDouble(4, location.getX()); stmt.setDouble(5, location.getY()); stmt.setDouble(6, location.getZ());
+            stmt.setFloat(7, location.getYaw()); stmt.setFloat(8, location.getPitch()); stmt.executeUpdate();
+        } catch (SQLException e) { throw new IllegalStateException("Could not save element spawn", e); }
+    }
+
+    private Location getStoredSpawn(String element) {
+        try (PreparedStatement stmt = plugin.getDatabaseManager().getConnection().prepareStatement(
+                "SELECT world, x, y, z, yaw, pitch FROM element_spawns WHERE element = ? ORDER BY slot")) {
+            stmt.setString(1, element.toLowerCase());
+            ResultSet rs = stmt.executeQuery();
+            java.util.List<Location> spawns = new java.util.ArrayList<>();
+            while (rs.next()) {
+                org.bukkit.World world = Bukkit.getWorld(rs.getString("world"));
+                if (world != null) spawns.add(new Location(world, rs.getDouble("x"), rs.getDouble("y"), rs.getDouble("z"), rs.getFloat("yaw"), rs.getFloat("pitch")));
+            }
+            return spawns.isEmpty() ? null : spawns.get(ThreadLocalRandom.current().nextInt(spawns.size()));
+        } catch (SQLException e) { plugin.getLogger().warning("Could not load element spawns: " + e.getMessage()); return null; }
     }
 
     public void changeElementViaChanger(Player player, String newElement) {
@@ -202,14 +225,8 @@ public class ElementManager {
             plugin.getProtectedMovesManager().clearProtectedMoves(player.getUniqueId());
             
             java.util.List<String> previouslyRemoved = plugin.getStatsManager().getRemovedMoves(player.getUniqueId());
-            if (plugin.getProjectKorraIntegration().isScrollsEnabled()) {
-                for (String m : previouslyRemoved) {
-                    plugin.getScrollManager().giveScrollForRestore(player, m);
-                }
-            } else {
-                for (String m : previouslyRemoved) {
-                    plugin.getLuckPermsIntegration().grantPermission(player.getUniqueId(), "bending.ability." + m.toLowerCase());
-                }
+            for (String m : previouslyRemoved) {
+                plugin.getLuckPermsIntegration().grantPermission(player.getUniqueId(), "bending.ability." + m.toLowerCase());
             }
             
             if ("chi".equalsIgnoreCase(newElement)) {
@@ -242,6 +259,7 @@ public class ElementManager {
         } else {
             plugin.getProjectKorraIntegration().setPlayerElement(player, newElement);
         }
+        clearBendingSlots(player);
         plugin.getLuckPermsIntegration().grantProtectedMovePermissions(player, newElement);
         plugin.getProtectedMovesManager().setProtectedMoves(player.getUniqueId(), newElement);
         
@@ -291,12 +309,20 @@ public class ElementManager {
         data.setElementPermanent(true);
 
         plugin.getProjectKorraIntegration().setPlayerElement(player, newElement);
+        clearBendingSlots(player);
         plugin.getLuckPermsIntegration().grantProtectedMovePermissions(player, newElement);
         plugin.getProtectedMovesManager().setProtectedMoves(player.getUniqueId(), newElement);
         plugin.getProjectKorraIntegration().grantDefaultMoves(player, newElement);
         plugin.getPlayerDataManager().savePlayerData(data);
 
         player.sendMessage(MessageUtil.success("Your element has been changed to " + newElement.toUpperCase() + "!"));
+    }
+
+    public void clearBendingSlots(Player player) {
+        com.projectkorra.projectkorra.BendingPlayer bPlayer =
+                com.projectkorra.projectkorra.BendingPlayer.getBendingPlayer(player);
+        if (bPlayer == null) return;
+        bPlayer.getAbilities().clear();
     }
 
     

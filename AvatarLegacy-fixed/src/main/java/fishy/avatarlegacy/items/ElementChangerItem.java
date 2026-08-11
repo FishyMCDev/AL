@@ -18,7 +18,24 @@ public class ElementChangerItem {
     public static final String KEY_ID = "element_changer";
 
     public static ItemStack create(AvatarLegacy plugin) {
-        ItemStack item = new ItemStack(Material.CRYING_OBSIDIAN);
+        ItemStack item = null;
+
+        String nexoId = plugin.getConfig().getString("element-changer.nexo-id", "");
+        if (nexoId != null && !nexoId.isBlank()) {
+            try {
+                Object builder = Class.forName("com.nexomc.nexo.api.NexoItems")
+                        .getMethod("itemFromId", String.class)
+                        .invoke(null, nexoId);
+                if (builder != null) {
+                    Object built = builder.getClass().getMethod("build").invoke(builder);
+                    if (built instanceof ItemStack stack) item = stack;
+                }
+            } catch (Throwable ignored) {
+                // Nexo not installed, or id not found — fall back to the vanilla item below.
+            }
+        }
+        if (item == null) item = new ItemStack(Material.CRYING_OBSIDIAN);
+
         ItemMeta meta = item.getItemMeta();
 
         String rawName = plugin.getConfig().getString("element-changer.item-name", "&5&lElement Changer");
@@ -33,8 +50,6 @@ public class ElementChangerItem {
         }
         meta.lore(lore);
 
-        meta.setEnchantmentGlintOverride(true);
-
         NamespacedKey key = new NamespacedKey(plugin, KEY_ID);
         meta.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
 
@@ -42,8 +57,13 @@ public class ElementChangerItem {
         return item;
     }
 
+    /** Percentage (0-100) chance this item is added to a structure chest. Kept low by default. */
+    public static double getChanceInStructure(AvatarLegacy plugin) {
+        return plugin.getConfig().getDouble("element-changer.chance-in-structure", 0.0D);
+    }
+
     public static boolean isElementChanger(AvatarLegacy plugin, ItemStack item) {
-        if (item == null || item.getType() != Material.CRYING_OBSIDIAN) return false;
+        if (item == null || item.getType() == Material.AIR) return false;
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return false;
         NamespacedKey key = new NamespacedKey(plugin, KEY_ID);

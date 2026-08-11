@@ -8,6 +8,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.DateTimeException;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
@@ -24,7 +25,7 @@ public class TaxCollectionTask extends BukkitRunnable {
     public void run() {
         String collectionTime = plugin.getConfig().getString("taxes.collection-time", "00:00");
         LocalTime now = LocalTime.now();
-        LocalTime target = LocalTime.parse(collectionTime);
+        LocalTime target = parseCollectionTime(collectionTime);
 
         if (now.getHour() == target.getHour() && now.getMinute() == target.getMinute()) {
             if (!hasCollectedToday) {
@@ -34,6 +35,43 @@ public class TaxCollectionTask extends BukkitRunnable {
         } else {
             hasCollectedToday = false;
         }
+    }
+
+    /**
+     * Parses "taxes.collection-time" tolerantly. Accepts standard "HH:mm"/"H:mm",
+     * and also digit-only values like "720" or "0720" (treated as HHmm), since a
+     * missing colon in the config previously caused this task to throw every run
+     * and never collect taxes.
+     */
+    private LocalTime parseCollectionTime(String raw) {
+        if (raw == null || raw.isBlank()) return LocalTime.MIDNIGHT;
+        String value = raw.trim();
+        try {
+            return LocalTime.parse(value);
+        } catch (java.time.format.DateTimeParseException ignored) {
+            // Fall through to digit-only handling below.
+        }
+
+        String digits = value.replaceAll("[^0-9]", "");
+        if (!digits.isEmpty()) {
+            if (digits.length() <= 2) digits = digits + "00"; // e.g. "7" -> hour 7, minute 0
+            while (digits.length() < 4) digits = "0" + digits;   // left-pad to HHmm
+            if (digits.length() > 4) digits = digits.substring(digits.length() - 4);
+
+            try {
+                int hour = Integer.parseInt(digits.substring(0, 2));
+                int minute = Integer.parseInt(digits.substring(2, 4));
+                if (hour <= 23 && minute <= 59) {
+                    return LocalTime.of(hour, minute);
+                }
+            } catch (NumberFormatException | DateTimeException ignored) {
+                // fall through to default below
+            }
+        }
+
+        plugin.getLogger().warning("[AvatarLegacy] Invalid taxes.collection-time '" + raw
+                + "', defaulting to 00:00. Expected format: HH:mm (e.g. 07:20).");
+        return LocalTime.MIDNIGHT;
     }
 
     private void collectTaxes() {
@@ -51,6 +89,13 @@ public class TaxCollectionTask extends BukkitRunnable {
 
                 List<UUID> citizens = plugin.getNationManager().getNationCitizens(nationId);
                 double totalCollected = 0;
+                UUID leader = plugin.getNationManager().getNationLeader(nationId);
+                if (leader != null) {
+                    plugin.getStatsManager().awardConfiguredXp(leader, "nation-leader-daily", 1);
+                }
+                if (citizens.size() >= 3 && leader != null) {
+                    plugin.getStatsManager().awardConfiguredXp(leader, "nation-3plus-daily", 1);
+                }
 
                 for (UUID citizenUuid : citizens) {
                     double balance = plugin.getEconomyManager().getBalance(citizenUuid);

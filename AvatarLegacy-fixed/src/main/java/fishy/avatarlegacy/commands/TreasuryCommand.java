@@ -22,7 +22,7 @@ public class TreasuryCommand implements CommandExecutor {
             return true;
         }
 
-        if (CommandUtil.requiresCharacter(plugin, player)) return true;
+        if (CommandUtil.requiresProfile(plugin, player)) return true;
 
         Integer nationId = plugin.getNationManager().getPlayerNation(player.getUniqueId());
 

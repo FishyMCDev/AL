@@ -31,7 +31,7 @@ public class PlayerBindAbilityListener implements Listener {
         
         if (plugin.getPlayerDataManager().getPlayerData(player.getUniqueId()) == null) {
             event.setCancelled(true);
-            player.sendMessage(MessageUtil.error("You must create a character before binding abilities!"));
+            player.sendMessage(MessageUtil.error("Your profile is still loading. Please try again."));
             return;
         }
 

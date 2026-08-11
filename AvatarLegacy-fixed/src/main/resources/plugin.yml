@@ -1,12 +1,11 @@
 name: AvatarLegacy
-version: '1.0-BETA'
+version: '2.0'
 main: fishy.avatarlegacy.AvatarLegacy
 api-version: '1.21'
 authors: [Fishy__MC]
 description: Complete Avatar Legacy server plugin (giggles)
 
-
-depend: [Vault, LuckPerms, WorldGuard, ProjectKorra]
+depend: [Vault, LuckPerms, WorldGuard, ProjectKorra, ProjectAddons]
 softdepend: [Citizens]
 
 commands:
@@ -18,6 +17,10 @@ commands:
     description: View your total active playtime
     usage: /<command>
 
+  teach:
+    description: Teach your bending element (including Chi) to the current Avatar
+    usage: /<command>
+
   xp:
     description: View custom XP amount
     usage: /<command>
@@ -26,10 +29,6 @@ commands:
     description: Admin commands for AvatarLegacy
     usage: /<command> <setxp|setplaytime|resetplayer|deletedata|setelement> [args]
     permission: avatarlegacy.admin
-
-  shop:
-    description: Open the server shop GUI
-    usage: /<command>
 
   balance:
     description: Check your yen balance
@@ -49,14 +48,14 @@ commands:
     usage: /<command> <give|take|set> <player> <amount>
     permission: avatarlegacy.admin.economy
 
-  character:
-    description: Character management
-    usage: /<command> <create|delete|info>
-
-  characterwho:
-    description: View a player's character info
+  playerwho:
+    description: View a player's profile info
     usage: /<command> <player>
-    aliases: [charwho]
+    aliases: [pwho]
+
+  player:
+    description: Player profile utility commands
+    usage: /<command> deathbans
 
   stats:
     description: View your stats and debuffs
@@ -78,10 +77,24 @@ commands:
     description: Convert Yen into custom XP
     usage: /<command> [amount]
 
-  sellgui:
-    description: Open the quick-sell GUI to sell items fast
+  skilltree:
+    description: Open your bending skill tree
+    usage: /<command> [element]
+    aliases: [ st, skills, abilities ]
+
+  elementspawn:
+    description: Set one of the three persistent element spawns
+    usage: /<command> set <element> <1|2|3>
+    permission: avatarlegacy.admin
+
+  reroll:
+    description: Reroll your current element's subelement traits
     usage: /<command>
-    aliases: [sell, quicksell]
+
+  avatarlegacy:
+    description: AvatarLegacy administration
+    usage: /<command> reload
+    permission: avatarlegacy.admin
 
 permissions:
   avatarlegacy.admin:
@@ -103,3 +116,7 @@ permissions:
   avatarlegacy.avatar:
     description: Avatar status
     default: false
+
+  avatarlegacy.traits.reroll:
+    description: Allows trait rerolls
+    default: op

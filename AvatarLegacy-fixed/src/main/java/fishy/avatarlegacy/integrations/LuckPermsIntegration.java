@@ -60,11 +60,11 @@ public class LuckPermsIntegration {
         }
     }
 
-    
-    
-    
 
-    
+
+
+
+
     public void addGroup(UUID uuid, String groupName) {
         if (!isEnabled()) return;
         User cached = luckPerms.getUserManager().getUser(uuid);
@@ -81,7 +81,7 @@ public class LuckPermsIntegration {
         }
     }
 
-    
+
     public void removeGroup(UUID uuid, String groupName) {
         if (!isEnabled()) return;
         User cached = luckPerms.getUserManager().getUser(uuid);
@@ -98,7 +98,7 @@ public class LuckPermsIntegration {
         }
     }
 
-    
+
 
     public void grantProtectedMovePermissions(Player player, String element) {
         if (player == null) return;
@@ -106,38 +106,47 @@ public class LuckPermsIntegration {
     }
 
     public void grantProtectedMovePermissions(Player player, String element, UUID uuid) {
-        
-        
-        if (plugin.getProjectKorraIntegration().isScrollsEnabled()) return;
-        List<String> moves = plugin.getConfig()
-                .getStringList("protected-default-moves." + element.toLowerCase());
+        List<String> moves = plugin.getConfig().getStringList("protected-default-moves." + element.toLowerCase());
         for (String move : moves) {
+            if (move == null || move.isBlank()) continue;
             grantPermission(uuid, "bending.ability." + move.toLowerCase());
         }
     }
 
     public void revokeProtectedMovePermissions(Player player, String element) {
         if (player == null) return;
-        
-        if (plugin.getProjectKorraIntegration().isScrollsEnabled()) return;
-        List<String> moves = plugin.getConfig()
-                .getStringList("protected-default-moves." + element.toLowerCase());
+        List<String> moves = plugin.getConfig().getStringList("protected-default-moves." + element.toLowerCase());
         for (String move : moves) {
+            if (move == null || move.isBlank()) continue;
             revokePermission(player.getUniqueId(), "bending.ability." + move.toLowerCase());
         }
     }
 
+    /**
+     * Grants every hardcoded team-combo move listed under {@code combo-moves}
+     * in config.yml (e.g. Cyclone, StormCloud, BlazingSmash...). These are
+     * NOT skill-tree nodes — they're always usable by every player from the
+     * moment they join, independent of element, skill tree progress, or
+     * death penalties. Safe to call repeatedly (idempotent).
+     */
+    public void grantComboMovePermissions(UUID uuid) {
+        List<String> combos = plugin.getConfig().getStringList("combo-moves");
+        for (String move : combos) {
+            if (move == null || move.isBlank()) continue;
+            grantPermission(uuid, "bending.ability." + move.toLowerCase());
+        }
+    }
+
     public void grantAvatarPermissions(UUID uuid) {
-        grantPermission(uuid, "bending.command.add");
+        revokePermission(uuid, "bending.command.add");
+        removeGroup(uuid, "Avatar");
         grantPermission(uuid, "avatarlegacy.avatar");
-        
-        addGroup(uuid, "Avatar");
     }
 
     public void revokeAvatarPermissions(UUID uuid) {
         revokePermission(uuid, "bending.command.add");
         revokePermission(uuid, "avatarlegacy.avatar");
-        
+
         removeGroup(uuid, "Avatar");
     }
 
@@ -160,10 +169,10 @@ public class LuckPermsIntegration {
                 String key = node.getKey();
                 boolean shouldRemove =
                         key.startsWith("bending.ability.") ||
-                        key.equals("bending.command.choose") ||
-                        key.equals("bending.command.rechoose") ||
-                        key.equals("bending.command.add") ||
-                        key.equals("avatarlegacy.avatar");
+                                key.equals("bending.command.choose") ||
+                                key.equals("bending.command.rechoose") ||
+                                key.equals("bending.command.add") ||
+                                key.equals("avatarlegacy.avatar");
 
                 if (!shouldRemove && node instanceof InheritanceNode) {
                     String groupName = ((InheritanceNode) node).getGroupName();

@@ -43,10 +43,11 @@ public class AdminCommand implements CommandExecutor {
             sender.sendMessage(MessageUtil.prefix("Admin", "Commands:"));
             sender.sendMessage(MessageUtil.info("/admin setxp <player> <amount>"));
             sender.sendMessage(MessageUtil.info("/admin setplaytime <player> <seconds>"));
+            sender.sendMessage(MessageUtil.info("/admin addplaytime <player> <seconds> | addkills <player> <amount>"));
             sender.sendMessage(MessageUtil.info("/admin setelement <player> <element>"));
             sender.sendMessage(MessageUtil.info("/admin resetplayer <player>"));
             sender.sendMessage(MessageUtil.info("/admin deletedata <player>"));
-            sender.sendMessage(MessageUtil.info("/admin setcharname <player> <name>"));
+            sender.sendMessage(MessageUtil.info("/admin setprofilename <player> <name>"));
             sender.sendMessage(MessageUtil.info("/admin setmaxdeaths <amount>"));
             sender.sendMessage(MessageUtil.info("/admin setrestorecount <player> <amount>"));
             sender.sendMessage(MessageUtil.info("/admin revivechar <player>"));
@@ -65,7 +66,7 @@ public class AdminCommand implements CommandExecutor {
                     int amount = Integer.parseInt(args[2]);
                     if (amount < 0) { sender.sendMessage(MessageUtil.error("Amount cannot be negative!")); return true; }
                     PlayerData data = plugin.getPlayerDataManager().getPlayerData(target.getUniqueId());
-                    if (data == null) { sender.sendMessage(MessageUtil.error("Player has no character!")); return true; }
+                    if (data == null) { sender.sendMessage(MessageUtil.error("Player profile is not loaded!")); return true; }
                     data.setCustomXP(amount);
                     plugin.getPlayerDataManager().savePlayerData(data);
                     sender.sendMessage(MessageUtil.success("Set " + target.getName() + "'s XP to " + amount));
@@ -81,7 +82,7 @@ public class AdminCommand implements CommandExecutor {
                     long seconds = Long.parseLong(args[2]);
                     if (seconds < 0) { sender.sendMessage(MessageUtil.error("Amount cannot be negative!")); return true; }
                     PlayerData data = plugin.getPlayerDataManager().getPlayerData(target.getUniqueId());
-                    if (data == null) { sender.sendMessage(MessageUtil.error("Player has no character!")); return true; }
+                    if (data == null) { sender.sendMessage(MessageUtil.error("Player profile is not loaded!")); return true; }
                     data.setPlaytimeSeconds(seconds);
                     plugin.getPlayerDataManager().savePlayerData(data);
                     plugin.getElementManager().checkAndMakePermanent(target);
@@ -94,6 +95,27 @@ public class AdminCommand implements CommandExecutor {
                 } catch (NumberFormatException e) { sender.sendMessage(MessageUtil.error("Invalid number! Enter seconds.")); }
             }
 
+            case "addplaytime" -> {
+                if (args.length < 3) { sender.sendMessage(MessageUtil.error("Usage: /admin addplaytime <player> <seconds>")); return true; }
+                Player target = Bukkit.getPlayer(args[1]);
+                PlayerData data = target == null ? null : plugin.getPlayerDataManager().getPlayerData(target.getUniqueId());
+                try {
+                    long amount = Long.parseLong(args[2]);
+                    if (data == null || amount < 0) throw new NumberFormatException();
+                    data.addPlaytimeSeconds(amount); plugin.getPlayerDataManager().savePlayerData(data);
+                    sender.sendMessage(MessageUtil.success("Added playtime to " + target.getName()));
+                } catch (NumberFormatException e) { sender.sendMessage(MessageUtil.error("Player must be online and seconds must be positive.")); }
+            }
+            case "addkills" -> {
+                if (args.length < 3) { sender.sendMessage(MessageUtil.error("Usage: /admin addkills <player> <amount>")); return true; }
+                Player target = Bukkit.getPlayer(args[1]);
+                try {
+                    int amount = Integer.parseInt(args[2]);
+                    if (target == null || amount < 0) throw new NumberFormatException();
+                    for (int i = 0; i < amount; i++) plugin.getStatsManager().incrementKillCount(target.getUniqueId());
+                    sender.sendMessage(MessageUtil.success("Added " + amount + " kills to " + target.getName()));
+                } catch (NumberFormatException e) { sender.sendMessage(MessageUtil.error("Player must be online and amount must be positive.")); }
+            }
             case "setelement" -> {
                 if (args.length < 3) { sender.sendMessage(MessageUtil.error("Usage: /admin setelement <player> <fire|water|earth|air>")); return true; }
                 Player target = Bukkit.getPlayer(args[1]);
@@ -124,13 +146,13 @@ public class AdminCommand implements CommandExecutor {
                 }
             }
 
-            case "setcharname" -> {
-                if (args.length < 3) { sender.sendMessage(MessageUtil.error("Usage: /admin setcharname <player> <n>")); return true; }
+            case "setcharname", "setprofilename" -> {
+                if (args.length < 3) { sender.sendMessage(MessageUtil.error("Usage: /admin setprofilename <player> <n>")); return true; }
                 Player target = Bukkit.getPlayer(args[1]);
                 if (target == null) { sender.sendMessage(MessageUtil.error("Player not found or offline!")); return true; }
                 String newName = String.join(" ", java.util.Arrays.copyOfRange(args, 2, args.length));
                 plugin.getCharacterManager().setCharacterName(target.getUniqueId(), newName);
-                sender.sendMessage(MessageUtil.success("Character name set to §e" + newName + "§a for " + target.getName()));
+                sender.sendMessage(MessageUtil.success("Profile name set to §e" + newName + "§a for " + target.getName()));
             }
 
             case "setmaxdeaths" -> {
@@ -177,9 +199,9 @@ public class AdminCommand implements CommandExecutor {
                 org.bukkit.OfflinePlayer op = org.bukkit.Bukkit.getOfflinePlayer(args[1]);
                 if (!op.hasPlayedBefore()) { sender.sendMessage(MessageUtil.error("Player not found.")); return true; }
                 if (plugin.getPlayerDataManager().getPlayerData(op.getUniqueId()) != null) {
-                    sender.sendMessage(MessageUtil.error(op.getName() + " already has an active character!")); return true;
+                    sender.sendMessage(MessageUtil.error(op.getName() + " already has an active player profile!")); return true;
                 }
-                sender.sendMessage(MessageUtil.success("§e" + op.getName() + "§a can now use /character create <n>"));
+                sender.sendMessage(MessageUtil.success("§e" + op.getName() + "§a can now choose bending with /b choose <element>"));
             }
 
             case "givechanger" -> {
@@ -219,7 +241,7 @@ public class AdminCommand implements CommandExecutor {
         }
 
         sender.sendMessage(MessageUtil.warning("⚠ WARNING: This will permanently delete ALL data for: §e" + resolvedName));
-        sender.sendMessage(MessageUtil.warning("This includes: character, economy, stats, deaths, moves, nation, LuckPerms permissions, PKScrolls data."));
+        sender.sendMessage(MessageUtil.warning("This includes: player profile, economy, stats, deaths, moves, nation, and LuckPerms permissions."));
         sender.sendMessage(MessageUtil.warning("THIS CANNOT BE UNDONE!"));
         sender.sendMessage(MessageUtil.info("Type: §e/admin deletedata " + targetName + " confirm §7within 30 seconds to proceed."));
     }
@@ -278,7 +300,7 @@ public class AdminCommand implements CommandExecutor {
 
         String[] uuidTables = {
             "players", "protected_moves", "offline_notifications",
-            "economy", "characters", "player_stats", "death_log", "avatar_candidates"
+            "economy", "player_profiles", "player_stats", "death_log", "avatar_candidates", "player_penalties"
         };
 
         for (String table : uuidTables) {

@@ -20,7 +20,7 @@ public class AvatarManager {
 
     public AvatarManager(AvatarLegacy plugin) {
         this.plugin = plugin;
-        
+
         java.util.List<String> configCycle = plugin.getConfig().getStringList("avatar.cycle-order");
         if (configCycle != null && configCycle.size() >= 2) {
             cycleOrder = configCycle.stream().map(String::toLowerCase).toArray(String[]::new);
@@ -51,16 +51,37 @@ public class AvatarManager {
 
     public void selectFirstAvatar() {
         String cycleElement = getCurrentCycleElement();
-        List<UUID> eligible = getEligiblePlayersForCycle(cycleElement);
-        if (eligible.isEmpty()) {
-            plugin.getLogger().warning(
-                "No eligible players for first Avatar selection! (cycle=" + cycleElement + ")");
-            return;
+        updateCandidateScores();
+        UUID best = getTopScoringEligible(cycleElement);
+        if (best == null) {
+            List<UUID> eligible = getEligiblePlayersForCycle(cycleElement);
+            if (eligible.isEmpty()) {
+                plugin.getLogger().warning(
+                        "No eligible players for first Avatar selection! (cycle=" + cycleElement + ")");
+                return;
+            }
+            best = eligible.get(new Random().nextInt(eligible.size()));
         }
-        setAvatar(eligible.get(new Random().nextInt(eligible.size())));
+        setAvatar(best);
     }
 
-    
+    /** Highest average_score among eligible candidates for the given cycle element, or null if none. */
+    private UUID getTopScoringEligible(String cycleElement) {
+        Connection conn = plugin.getDatabaseManager().getConnection();
+        try (PreparedStatement stmt = conn.prepareStatement(
+                "SELECT ac.uuid FROM avatar_candidates ac JOIN players p ON ac.uuid = p.uuid " +
+                        "WHERE p.element = ? AND p.element_permanent = 1 AND ac.eligible = 1 " +
+                        "ORDER BY ac.average_score DESC LIMIT 1")) {
+            stmt.setString(1, cycleElement.toLowerCase());
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) return UUID.fromString(rs.getString("uuid"));
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Failed to get top scoring candidate: " + e.getMessage());
+        }
+        return null;
+    }
+
+
     private List<UUID> getEligiblePlayersForCycle(String cycleElement) {
         List<UUID> eligible = new ArrayList<>();
         int minPlaytimeHours = plugin.getConfig().getInt("avatar.first-avatar.min-playtime-hours", 5);
@@ -102,31 +123,14 @@ public class AvatarManager {
         if (player != null) {
             plugin.getProjectKorraIntegration().addAllElements(player);
 
-            boolean scrollsEnabled = plugin.getProjectKorraIntegration().isScrollsEnabled();
             for (String el : new String[]{"fire", "water", "earth", "air"}) {
-                
                 plugin.getLuckPermsIntegration().grantProtectedMovePermissions(player, el, uuid);
                 plugin.getProtectedMovesManager().addProtectedMovesForElement(uuid, el);
-                if (scrollsEnabled) {
-                    for (String move : plugin.getConfig().getStringList("protected-default-moves." + el)) {
-                        plugin.getScrollManager().giveScrollForUnlock(player, move);
-                    }
-                }
             }
 
-            
-            
-            
-            if (!scrollsEnabled) {
-                List<String> alreadyLearned = plugin.getLuckPermsIntegration().getLearnedAbilities(uuid);
-                for (String move : alreadyLearned) {
-                    com.projectkorra.projectkorra.ability.CoreAbility ca =
-                            com.projectkorra.projectkorra.ability.CoreAbility.getAbility(move);
-                    if (ca != null && ca.getElement() != null
-                            && ca.getElement().toString().equalsIgnoreCase("chi")) continue;
-                    plugin.getLuckPermsIntegration().grantPermission(uuid, "bending.ability." + move.toLowerCase());
-                }
-            }
+            // Grant only the avatar tree's default moves.
+            // All other avatar tree nodes must be unlocked progressively via /skilltree avatar.
+            plugin.getSkillTreeManager().grantAvatarDefaults(player);
         }
 
         PlayerData data = plugin.getPlayerDataManager().getPlayerData(uuid);
@@ -137,34 +141,30 @@ public class AvatarManager {
 
     public void stripAvatarState(UUID uuid) {
         Player player = Bukkit.getPlayer(uuid);
-        boolean scrollsEnabled = plugin.getProjectKorraIntegration().isScrollsEnabled();
 
         plugin.getLuckPermsIntegration().revokeAvatarPermissions(uuid);
 
         PlayerData data = plugin.getPlayerDataManager().getPlayerData(uuid);
         final String originalElement = data != null ? data.getElement() : null;
 
-        
+
         for (String el : new String[]{"fire", "water", "earth", "air"}) {
             List<String> moves = plugin.getConfig().getStringList("protected-default-moves." + el);
             boolean isOwnElement = el.equalsIgnoreCase(originalElement);
             for (String move : moves) {
-                if (scrollsEnabled) {
-                    
-                    
-                    if (!isOwnElement && player != null) {
-                        plugin.getScrollManager().resetScrollProgress(player, move);
-                    }
-                } else {
-                    
-                    if (!isOwnElement) {
-                        plugin.getLuckPermsIntegration().revokePermission(uuid, "bending.ability." + move.toLowerCase());
-                    }
+                if (!isOwnElement) {
+                    plugin.getLuckPermsIntegration().revokePermission(uuid, "bending.ability." + move.toLowerCase());
                 }
             }
         }
 
+
         plugin.getProtectedMovesManager().clearProtectedMoves(uuid);
+
+        // Revoke all avatar skill-tree permissions the player had unlocked
+        if (player != null) {
+            plugin.getSkillTreeManager().revokeAvatarTree(player);
+        }
 
         if (player != null) {
             com.projectkorra.projectkorra.BendingPlayer bPlayer =
@@ -179,7 +179,7 @@ public class AvatarManager {
             }
 
             if (originalElement != null) {
-                
+
                 plugin.getLuckPermsIntegration().grantProtectedMovePermissions(player, originalElement);
                 plugin.getProtectedMovesManager().setProtectedMoves(uuid, originalElement);
             }
@@ -241,10 +241,11 @@ public class AvatarManager {
         Connection conn = plugin.getDatabaseManager().getConnection();
         try (PreparedStatement stmt = conn.prepareStatement("UPDATE avatar_cycle SET reincarnation_active = 0")) {
             stmt.executeUpdate();
-            plugin.getLogger().info("Reincarnation period has ended. A new Avatar can now be selected.");
+            plugin.getLogger().info("Reincarnation period has ended. Selecting the next Avatar by score.");
         } catch (SQLException e) {
             plugin.getLogger().severe("Failed to end reincarnation period: " + e.getMessage());
         }
+        selectFirstAvatar();
     }
 
     private void advanceCycle() {
@@ -300,7 +301,7 @@ public class AvatarManager {
         cachedCurrentAvatar = null;
     }
 
-    
+
     public void refreshCachedAvatar() {
         cachedCurrentAvatar = getCurrentAvatar();
     }
@@ -365,23 +366,7 @@ public class AvatarManager {
         long blocksPlaced = plugin.getStatsManager().getBlocksPlaced(uuid);
         long blocksModified = Math.max(0, blocksBroken + blocksPlaced);
 
-        int movesLearned = 0;
-        if (plugin.getProjectKorraIntegration().isScrollsEnabled()) {
-            Player online = Bukkit.getPlayer(uuid);
-            java.util.Set<String> unique = new java.util.HashSet<>();
-            if (online != null) {
-                for (String a : plugin.getProjectKorraIntegration().getSlottedAbilities(online)) {
-                    if (a != null) unique.add(a.toLowerCase());
-                }
-            }
-            for (String a : plugin.getProtectedMovesManager().getProtectedMoves(uuid)) {
-                if (a != null) unique.add(a.toLowerCase());
-            }
-            unique.removeIf(s -> s == null || s.isBlank());
-            movesLearned = unique.size();
-        } else {
-            movesLearned = plugin.getLuckPermsIntegration().getLearnedAbilities(uuid).size();
-        }
+        int movesLearned = plugin.getLuckPermsIntegration().getLearnedAbilities(uuid).size();
 
         double playtimeHours = playtimeSeconds / 3600.0;
         double capHours = plugin.getConfig().getDouble("avatar.score.playtime-cap-hours", 24.0);
@@ -394,15 +379,19 @@ public class AvatarManager {
 
         double score = baseScore * (1.0 + (Math.max(0, Math.min(100, interconnection)) / 100.0));
 
+        double damageCap = plugin.getConfig().getDouble("avatar.score.damage-cap", 5000.0);
+        int cappedDamageScore = (int) Math.round(Math.min(damageCap, Math.max(0.0, pkDamageDealt)));
+
         Connection conn = plugin.getDatabaseManager().getConnection();
         try (PreparedStatement stmt = conn.prepareStatement(
-                "INSERT OR REPLACE INTO avatar_candidates (uuid, interconnection_score, experience_score, playtime_score, average_score, eligible) VALUES (?, ?, ?, ?, ?, ?)")) {
+                "INSERT OR REPLACE INTO avatar_candidates (uuid, interconnection_score, experience_score, playtime_score, damage_score, average_score, eligible) VALUES (?, ?, ?, ?, ?, ?, ?)")) {
             stmt.setString(1, uuid.toString());
             stmt.setInt(2, interconnection);
             stmt.setInt(3, Math.max(0, movesLearned));
             stmt.setInt(4, (int) Math.floor(cappedHours));
-            stmt.setDouble(5, score);
-            stmt.setBoolean(6, true);
+            stmt.setInt(5, cappedDamageScore);
+            stmt.setDouble(6, score);
+            stmt.setBoolean(7, true);
             stmt.executeUpdate();
         } catch (SQLException e) {
             plugin.getLogger().severe("Failed to update candidate score: " + e.getMessage());
@@ -445,5 +434,14 @@ public class AvatarManager {
         } catch (SQLException e) {
             plugin.getLogger().severe("Failed to set interconnection score: " + e.getMessage());
         }
+    }
+
+    private boolean isChiAbility(com.projectkorra.projectkorra.ability.CoreAbility ability) {
+        if (ability == null || ability.getElement() == null) return false;
+        com.projectkorra.projectkorra.Element element = ability.getElement();
+        String elementName = element instanceof com.projectkorra.projectkorra.Element.SubElement subElement
+                ? subElement.getParentElement().getName()
+                : element.getName();
+        return "chi".equalsIgnoreCase(elementName);
     }
 }

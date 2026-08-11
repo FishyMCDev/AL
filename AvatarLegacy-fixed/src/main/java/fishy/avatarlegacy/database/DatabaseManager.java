@@ -37,7 +37,7 @@ public class DatabaseManager {
     }
 
     public void initializeTables() {
-        
+
         createPlayersTable();
         createProtectedMovesTable();
         createOfflineNotificationsTable();
@@ -45,7 +45,7 @@ public class DatabaseManager {
         createEconomyTable();
         createShopItemsTable();
         createTransactionLogTable();
-        createCharactersTable();
+        createPlayerProfilesTable();
         createPlayerStatsTable();
         createDeathLogTable();
         createNationsTable();
@@ -60,15 +60,21 @@ public class DatabaseManager {
         createAvatarCandidatesTable();
         createAvatarHistoryTable();
         createNationClaimsTable();
+        createNationBuildPermissionsTable();
+        createElementSpawnsTable();
+        createPlayerTraitsTable();
         createNationCoreHitsTable();
         createNationShieldTable();
+        createPlayerPenaltiesTable();
 
         migrateNationsTable();
         migrateCharactersTable();
         migratePlayerStatsTable();
+        migrateAvatarCandidatesTable();
         migrateNationUpgradesTable();
         migratePlayersTable();
-        createCharacterHistoryTable();
+        createPlayerLifecycleHistoryTable();
+        migrateLegacyCharacterTables();
     }
 
     private void createPlayersTable() {
@@ -150,12 +156,12 @@ public class DatabaseManager {
                 ");");
     }
 
-    private void createCharactersTable() {
-        executeUpdate("CREATE TABLE IF NOT EXISTS characters (" +
+    private void createPlayerProfilesTable() {
+        executeUpdate("CREATE TABLE IF NOT EXISTS player_profiles (" +
                 "uuid TEXT PRIMARY KEY," +
                 "creation_timestamp INTEGER," +
                 "deletion_allowed_timestamp INTEGER," +
-                "character_name TEXT DEFAULT 'Unknown'," +
+                "profile_name TEXT DEFAULT 'Unknown'," +
                 "restore_count INTEGER DEFAULT 0," +
                 "last_restore_timestamp INTEGER DEFAULT 0," +
                 "FOREIGN KEY (uuid) REFERENCES players(uuid)" +
@@ -358,14 +364,14 @@ public class DatabaseManager {
                 "ALTER TABLE player_stats ADD COLUMN kill_count INTEGER DEFAULT 0")) {
             s.executeUpdate();
         } catch (java.sql.SQLException ignored) {}
-        
-        
+
+
         try (java.sql.PreparedStatement s = connection.prepareStatement(
                 "ALTER TABLE player_stats ADD COLUMN pre_chi_bending_strength INTEGER DEFAULT -1")) {
             s.executeUpdate();
         } catch (java.sql.SQLException ignored) {}
-        
-        
+
+
         try (java.sql.PreparedStatement s = connection.prepareStatement(
                 "ALTER TABLE player_stats ADD COLUMN pre_chi_removed_moves TEXT DEFAULT NULL")) {
             s.executeUpdate();
@@ -387,14 +393,21 @@ public class DatabaseManager {
         } catch (java.sql.SQLException ignored) {}
     }
 
+    private void migrateAvatarCandidatesTable() {
+        try (java.sql.PreparedStatement s = connection.prepareStatement(
+                "ALTER TABLE avatar_candidates ADD COLUMN damage_score INTEGER DEFAULT 0")) {
+            s.executeUpdate();
+        } catch (java.sql.SQLException ignored) {}
+    }
+
     private void migrateNationsTable() {
-        
+
         try (java.sql.PreparedStatement stmt = connection.prepareStatement(
                 "ALTER TABLE nations ADD COLUMN nation_element TEXT DEFAULT NULL")) {
             stmt.executeUpdate();
         } catch (java.sql.SQLException ignored) {}
 
-        
+
         try (java.sql.PreparedStatement stmt = connection.prepareStatement(
                 "ALTER TABLE player_stats ADD COLUMN kill_count INTEGER DEFAULT 0")) {
             stmt.executeUpdate();
@@ -411,6 +424,30 @@ public class DatabaseManager {
                 "region_id TEXT NOT NULL," +
                 "UNIQUE(world, chunk_x, chunk_z)," +
                 "FOREIGN KEY (nation_id) REFERENCES nations(id)" +
+                ");");
+    }
+
+    private void createNationBuildPermissionsTable() {
+        executeUpdate("CREATE TABLE IF NOT EXISTS nation_build_permissions (" +
+                "owner_nation_id INTEGER NOT NULL," +
+                "allowed_nation_id INTEGER NOT NULL," +
+                "PRIMARY KEY (owner_nation_id, allowed_nation_id)" +
+                ");");
+    }
+
+    /** Persistent element spawns.  Keeping these in SQLite makes admin changes survive config reloads. */
+    private void createElementSpawnsTable() {
+        executeUpdate("CREATE TABLE IF NOT EXISTS element_spawns (" +
+                "element TEXT NOT NULL, slot INTEGER NOT NULL, world TEXT NOT NULL," +
+                "x REAL NOT NULL, y REAL NOT NULL, z REAL NOT NULL, yaw REAL DEFAULT 0, pitch REAL DEFAULT 0," +
+                "PRIMARY KEY (element, slot)" +
+                ");");
+    }
+
+    private void createPlayerTraitsTable() {
+        executeUpdate("CREATE TABLE IF NOT EXISTS player_traits (" +
+                "uuid TEXT NOT NULL, element TEXT NOT NULL, traits_json TEXT NOT NULL DEFAULT '[]'," +
+                "PRIMARY KEY (uuid, element)" +
                 ");");
     }
 
@@ -432,6 +469,13 @@ public class DatabaseManager {
                 ");");
     }
 
+    private void createPlayerPenaltiesTable() {
+        executeUpdate("CREATE TABLE IF NOT EXISTS player_penalties (" +
+                "uuid TEXT PRIMARY KEY," +
+                "deathban_count INTEGER DEFAULT 0" +
+                ");");
+    }
+
     private void migrateNationUpgradesTable() {
         try (java.sql.PreparedStatement s = connection.prepareStatement(
                 "ALTER TABLE nation_upgrades ADD COLUMN core_shield_level INTEGER DEFAULT 0")) {
@@ -444,22 +488,48 @@ public class DatabaseManager {
     }
 
     private void migratePlayersTable() {
-        
+
         try (java.sql.PreparedStatement s = connection.prepareStatement(
                 "ALTER TABLE players ADD COLUMN has_ever_chosen BOOLEAN DEFAULT 0")) {
             s.executeUpdate();
         } catch (java.sql.SQLException ignored) {}
 
-        
-        
-        
+
+
+
         try (java.sql.PreparedStatement s = connection.prepareStatement(
                 "UPDATE players SET has_ever_chosen = 1 WHERE element IS NOT NULL AND has_ever_chosen = 0")) {
             s.executeUpdate();
         } catch (java.sql.SQLException ignored) {}
     }
 
-    private void createCharacterHistoryTable() {
+    private void createPlayerLifecycleHistoryTable() {
+        executeUpdate("CREATE TABLE IF NOT EXISTS player_lifecycle_history (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "player_uuid TEXT NOT NULL," +
+                "profile_name TEXT NOT NULL," +
+                "player_username TEXT," +
+                "element TEXT," +
+                "death_count INTEGER DEFAULT 0," +
+                "kill_count INTEGER DEFAULT 0," +
+                "playtime_seconds INTEGER DEFAULT 0," +
+                "custom_xp INTEGER DEFAULT 0," +
+                "was_avatar BOOLEAN DEFAULT 0," +
+                "inactive_reason TEXT," +
+                "deactivated_timestamp INTEGER," +
+                "creation_timestamp INTEGER" +
+                ");");
+    }
+
+    private void migrateLegacyCharacterTables() {
+        executeUpdate("CREATE TABLE IF NOT EXISTS characters (" +
+                "uuid TEXT PRIMARY KEY," +
+                "creation_timestamp INTEGER," +
+                "deletion_allowed_timestamp INTEGER," +
+                "character_name TEXT DEFAULT 'Unknown'," +
+                "restore_count INTEGER DEFAULT 0," +
+                "last_restore_timestamp INTEGER DEFAULT 0" +
+                ");");
         executeUpdate("CREATE TABLE IF NOT EXISTS character_history (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "player_uuid TEXT NOT NULL," +
@@ -475,22 +545,28 @@ public class DatabaseManager {
                 "deactivated_timestamp INTEGER," +
                 "creation_timestamp INTEGER" +
                 ");");
+        executeUpdate("INSERT OR IGNORE INTO player_profiles " +
+                "(uuid, creation_timestamp, deletion_allowed_timestamp, profile_name, restore_count, last_restore_timestamp) " +
+                "SELECT uuid, creation_timestamp, deletion_allowed_timestamp, character_name, restore_count, last_restore_timestamp FROM characters");
+        executeUpdate("INSERT OR IGNORE INTO player_lifecycle_history " +
+                "(player_uuid, profile_name, player_username, element, death_count, kill_count, playtime_seconds, custom_xp, was_avatar, inactive_reason, deactivated_timestamp, creation_timestamp) " +
+                "SELECT player_uuid, character_name, player_username, element, death_count, kill_count, playtime_seconds, custom_xp, was_avatar, inactive_reason, deactivated_timestamp, creation_timestamp FROM character_history");
     }
 
     private void migrateCharactersTable() {
-        
+
         try (java.sql.PreparedStatement s = connection.prepareStatement(
-                "ALTER TABLE characters ADD COLUMN character_name TEXT DEFAULT 'Unknown'")) {
+                "ALTER TABLE player_profiles ADD COLUMN profile_name TEXT DEFAULT 'Unknown'")) {
             s.executeUpdate();
         } catch (java.sql.SQLException ignored) {}
-        
+
         try (java.sql.PreparedStatement s = connection.prepareStatement(
-                "ALTER TABLE characters ADD COLUMN restore_count INTEGER DEFAULT 0")) {
+                "ALTER TABLE player_profiles ADD COLUMN restore_count INTEGER DEFAULT 0")) {
             s.executeUpdate();
         } catch (java.sql.SQLException ignored) {}
-        
+
         try (java.sql.PreparedStatement s = connection.prepareStatement(
-                "ALTER TABLE characters ADD COLUMN last_restore_timestamp INTEGER DEFAULT 0")) {
+                "ALTER TABLE player_profiles ADD COLUMN last_restore_timestamp INTEGER DEFAULT 0")) {
             s.executeUpdate();
         } catch (java.sql.SQLException ignored) {}
     }

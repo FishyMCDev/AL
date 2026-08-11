@@ -14,7 +14,6 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
@@ -42,8 +41,8 @@ public class ElementChooseListener implements Listener {
 
         if (data == null) {
             event.setCancelled(true);
-            player.sendMessage(MessageUtil.error("You cannot choose an element without an active character!"));
-            player.sendMessage(MessageUtil.warning("Use \u00a7e/character create <n>\u00a76 to begin."));
+            player.sendMessage(MessageUtil.error("You cannot choose an element without an active player profile!"));
+            player.sendMessage(MessageUtil.warning("Reconnect and wait for your profile to load, then use \u00a7e/b choose <element>\u00a76."));
             return;
         }
 
@@ -77,6 +76,11 @@ public class ElementChooseListener implements Listener {
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!player.isOnline()) return;
             plugin.getElementManager().setElement(player, element);
+            java.util.List<String> traits = plugin.getTraitManager().applyTraits(player, element, false);
+            if (!"chi".equals(element)) player.sendMessage(traits.isEmpty()
+                    ? "§7You did not inherit any " + element + " subelement traits."
+                    : "§dYour " + element + " traits: §f" + String.join(", ", traits));
+            plugin.getSkillTreeManager().grantDefaultMovesForElement(player, element);
 
             
             
@@ -84,15 +88,6 @@ public class ElementChooseListener implements Listener {
                 spawnChiPlayerRandomly(player);
             }
 
-            if (plugin.getProjectKorraIntegration().isScrollsEnabled()) {
-                List<String> defaultMoves = plugin.getConfig()
-                        .getStringList("protected-default-moves." + element);
-                for (String move : defaultMoves) {
-                    plugin.getScrollManager().giveScrollForUnlock(player, move);
-                }
-            }
-
-            
             chooseCooldowns.put(uuid, System.currentTimeMillis());
 
             
@@ -196,4 +191,3 @@ public class ElementChooseListener implements Listener {
         player.setBedSpawnLocation(loc, true);
     }
 }
-

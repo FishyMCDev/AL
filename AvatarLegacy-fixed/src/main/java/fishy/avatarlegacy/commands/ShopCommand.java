@@ -22,7 +22,7 @@ public class ShopCommand implements CommandExecutor {
             return true;
         }
 
-        if (CommandUtil.requiresCharacter(plugin, player)) return true;
+        if (CommandUtil.requiresProfile(plugin, player)) return true;
 
         plugin.getShopGUI().openShop(player);
         return true;

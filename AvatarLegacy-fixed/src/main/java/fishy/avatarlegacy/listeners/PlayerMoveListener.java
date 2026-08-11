@@ -56,7 +56,7 @@ public class PlayerMoveListener implements Listener {
             event.setCancelled(true);
             if (!warned.contains(uuid)) {
                 warned.add(uuid);
-                player.sendMessage("§c§lYou cannot move without a character! §eUse /character create <n> §cto begin.");
+                player.sendMessage("§c§lYou cannot move yet! §eChoose your bending element with /b choose <element> §cto begin.");
                 org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> warned.remove(uuid), 100L);
             }
             return;

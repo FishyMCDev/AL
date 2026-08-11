@@ -25,7 +25,7 @@ public class AvatarCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (sender instanceof org.bukkit.entity.Player p) {
-            if (CommandUtil.requiresCharacter(plugin, p)) return true;
+            if (CommandUtil.requiresProfile(plugin, p)) return true;
         }
 
         if (args.length == 0) {
@@ -71,6 +71,12 @@ public class AvatarCommand implements CommandExecutor {
     }
 
     private void handleScores(CommandSender sender) {
+        if (sender instanceof Player player) {
+            plugin.getAvatarManager().updateCandidateScores();
+            new fishy.avatarlegacy.guis.AvatarScoresGUI(plugin).open(player);
+            return;
+        }
+
         sender.sendMessage(MessageUtil.prefix("Avatar", "Top 10 Avatar Candidates"));
 
         String currentElement = plugin.getAvatarManager().getCurrentCycleElement();
@@ -137,7 +143,7 @@ public class AvatarCommand implements CommandExecutor {
         fishy.avatarlegacy.models.PlayerData targetData =
                 plugin.getPlayerDataManager().getPlayerData(target.getUniqueId());
         if (targetData == null) {
-            sender.sendMessage(MessageUtil.error("Player has no character data!"));
+            sender.sendMessage(MessageUtil.error("Player profile data is unavailable!"));
             return;
         }
 
@@ -149,15 +155,15 @@ public class AvatarCommand implements CommandExecutor {
 
         String currentCycle = plugin.getAvatarManager().getCurrentCycleElement();
 
-        
+
         boolean force = args.length >= 3 && args[2].equalsIgnoreCase("--force");
         if (!force) {
             if (!currentCycle.equalsIgnoreCase(playerElement)) {
                 sender.sendMessage(MessageUtil.error(
-                    target.getName() + " is a " + (playerElement != null ? playerElement.toUpperCase() : "unknown")
-                    + " bender, but the current cycle is " + currentCycle.toUpperCase() + "!"));
+                        target.getName() + " is a " + (playerElement != null ? playerElement.toUpperCase() : "unknown")
+                                + " bender, but the current cycle is " + currentCycle.toUpperCase() + "!"));
                 sender.sendMessage(MessageUtil.warning(
-                    "Use §e/avatar set --force " + target.getName() + " §cto override the cycle restriction."));
+                        "Use §e/avatar set --force " + target.getName() + " §cto override the cycle restriction."));
                 return;
             }
         }
@@ -166,7 +172,7 @@ public class AvatarCommand implements CommandExecutor {
         sender.sendMessage(MessageUtil.success(target.getName() + " is now the Avatar!"));
         if (force && !currentCycle.equalsIgnoreCase(playerElement)) {
             sender.sendMessage(MessageUtil.warning("[ADMIN] Cycle override used — cycle is "
-                + currentCycle.toUpperCase() + " but player is " + (playerElement != null ? playerElement.toUpperCase() : "unknown") + "."));
+                    + currentCycle.toUpperCase() + " but player is " + (playerElement != null ? playerElement.toUpperCase() : "unknown") + "."));
         }
     }
 
@@ -216,8 +222,8 @@ public class AvatarCommand implements CommandExecutor {
             }
         }
 
-        
-        
+
+
         String upsert = "INSERT OR IGNORE INTO avatar_candidates (uuid, interconnection_score, experience_score, playtime_score, average_score, eligible) VALUES (?, 0, 0, 0, 0, 1)";
         try (PreparedStatement upsertStmt = conn.prepareStatement(upsert)) {
             upsertStmt.setString(1, target.getUniqueId().toString());
@@ -300,13 +306,13 @@ public class AvatarCommand implements CommandExecutor {
         String cycleDisplay = cycleList.isEmpty()
                 ? "Fire → Air → Water → Earth"
                 : String.join(" → ", cycleList.stream()
-                    .map(s -> s.substring(0, 1).toUpperCase() + s.substring(1).toLowerCase())
-                    .toArray(String[]::new));
+                .map(s -> s.substring(0, 1).toUpperCase() + s.substring(1).toLowerCase())
+                .toArray(String[]::new));
         sender.sendMessage(MessageUtil.info("Cycle Order: " + cycleDisplay));
     }
 
     private void handleHistory(CommandSender sender, String[] args) {
-        
+
         int page = 1;
         if (args.length >= 2) {
             try { page = Math.max(1, Integer.parseInt(args[1])); }
@@ -319,7 +325,7 @@ public class AvatarCommand implements CommandExecutor {
 
         Connection conn = plugin.getDatabaseManager().getConnection();
 
-        
+
         int total = 0;
         try (PreparedStatement cs = conn.prepareStatement("SELECT COUNT(*) FROM avatar_history")) {
             ResultSet cr = cs.executeQuery();
@@ -336,11 +342,11 @@ public class AvatarCommand implements CommandExecutor {
         }
 
         String sql = "SELECT ah.avatar_uuid, ah.element, ah.start_timestamp, ah.end_timestamp, ah.death_cause, " +
-                     "p.username " +
-                     "FROM avatar_history ah " +
-                     "LEFT JOIN players p ON ah.avatar_uuid = p.uuid " +
-                     "ORDER BY ah.start_timestamp DESC " +
-                     "LIMIT ? OFFSET ?";
+                "p.username " +
+                "FROM avatar_history ah " +
+                "LEFT JOIN players p ON ah.avatar_uuid = p.uuid " +
+                "ORDER BY ah.start_timestamp DESC " +
+                "LIMIT ? OFFSET ?";
 
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, pageSize);

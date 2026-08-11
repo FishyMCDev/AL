@@ -17,8 +17,8 @@ public class PlayerQuitListener implements Listener {
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         plugin.getPlaytimeManager().endSession(player);
+        plugin.getSkillTreeManager().unloadPlayerData(player.getUniqueId());
         plugin.getPlayerDataManager().unloadPlayerData(player.getUniqueId());
-        plugin.getCharacterManager().evictCache(player.getUniqueId());
         plugin.getElementManager().evictPlaytimeCache(player.getUniqueId());
         plugin.getTeleportManager().evict(player.getUniqueId());
         plugin.getSkyFreezeManager().evict(player.getUniqueId());

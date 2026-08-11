@@ -38,7 +38,7 @@ public class NationCommand implements CommandExecutor {
             sender.sendMessage(MessageUtil.error("Only players can use this command!"));
             return true;
         }
-        if (CommandUtil.requiresCharacter(plugin, player)) return true;
+        if (CommandUtil.requiresProfile(plugin, player)) return true;
         if (args.length == 0) { sendUsage(player); return true; }
 
         String subCmd = args[0].toLowerCase();
@@ -79,6 +79,7 @@ public class NationCommand implements CommandExecutor {
             case "war"      -> handleWar(player, args);
             case "truce"    -> handleTruce(player, args);
             case "ally"     -> handleAlly(player, args);
+            case "build"    -> handleBuild(player, args);
             case "enemy"    -> handleEnemy(player);
             case "toggle"   -> handleToggle(player, args);
             case "element"  -> handleElementSet(player, args);
@@ -129,8 +130,8 @@ public class NationCommand implements CommandExecutor {
 
         player.getInventory().addItem(new ItemStack(Material.BEACON, 1));
         player.sendMessage(MessageUtil.success("Nation '" + nationName + "' created!"));
-        int graceDays = plugin.getConfig().getInt("nation-creation.grace-period-days", 7);
-        player.sendMessage(MessageUtil.info("Your nation is protected from wars for " + graceDays + " days."));
+        long graceMinutes = plugin.getConfig().getLong("nation-creation.grace-period-minutes", 30);
+        player.sendMessage(MessageUtil.info("Your nation is protected from PvP and core attacks for " + graceMinutes + " minutes."));
         player.sendMessage(MessageUtil.warning("\u00a7e\u00a7lBefore using any nation commands, you must complete setup:"));
         player.sendMessage(MessageUtil.warning("\u00a7c\u2718 Step 1: /nation setspawn \u00a77- Stand where you want your nation spawn"));
         int maxDist = plugin.getConfig().getInt("core.max-distance-from-spawn", 10);
@@ -425,9 +426,43 @@ public class NationCommand implements CommandExecutor {
                 String n1 = plugin.getNationManager().getNationName(nationId);
                 String n2 = plugin.getNationManager().getNationName(proposingNation);
                 Bukkit.broadcast(MessageUtil.success("An alliance has been formed between " + n1 + " and " + n2 + "!"));
+                plugin.getWorldGuardIntegration().updateNationMembers(proposingNation);
+                plugin.getWorldGuardIntegration().updateNationMembers(nationId);
             }
-            default -> player.sendMessage(MessageUtil.error("Usage: /nation ally <propose <nation>|accept>"));
+            default -> {
+                // Shorthand requested by server design: /nation ally <other nation>.
+                Integer targetNation = plugin.getNationManager().getNationByName(args[1]);
+                if (targetNation == null || targetNation.equals(nationId)) {
+                    player.sendMessage(MessageUtil.error("Usage: /nation ally <nation>|propose <nation>|accept>")); return;
+                }
+                if (plugin.getNationManager().isAllied(nationId, targetNation)) {
+                    player.sendMessage(MessageUtil.info("Your nations are already allied.")); return;
+                }
+                pendingAlliances.put(targetNation, nationId);
+                player.sendMessage(MessageUtil.success("Alliance proposed to " + args[1] + "!"));
+                notifyNationLeader(targetNation, plugin.getNationManager().getNationName(nationId)
+                        + " has proposed an alliance! Use /nation ally accept to confirm.");
+            }
         }
+    }
+
+    private void handleBuild(Player player, String[] args) {
+        Integer ownerNation = plugin.getNationManager().getPlayerNation(player.getUniqueId());
+        if (ownerNation == null) { player.sendMessage(MessageUtil.error("You are not in a nation!")); return; }
+        if (!player.isOp() && !plugin.getNationManager().isNationLeader(player.getUniqueId(), ownerNation)) {
+            player.sendMessage(MessageUtil.error("Only the nation leader can set build access!")); return;
+        }
+        if (args.length != 3) { player.sendMessage(MessageUtil.error("Usage: /nation build <ally_name> <true|false>")); return; }
+        Integer allyNation = plugin.getNationManager().getNationByName(args[1]);
+        if (allyNation == null || !plugin.getNationManager().isAllied(ownerNation, allyNation)) {
+            player.sendMessage(MessageUtil.error("That nation is not an active ally.")); return;
+        }
+        if (!"true".equalsIgnoreCase(args[2]) && !"false".equalsIgnoreCase(args[2])) {
+            player.sendMessage(MessageUtil.error("Build access must be true or false.")); return;
+        }
+        boolean allowed = Boolean.parseBoolean(args[2]);
+        plugin.getNationManager().setAllyBuildPermission(ownerNation, allyNation, allowed);
+        player.sendMessage(MessageUtil.success("Build access for " + args[1] + " is now " + allowed + "."));
     }
 
     private void saveAlliance(int nation1Id, int nation2Id) {
@@ -746,6 +781,7 @@ public class NationCommand implements CommandExecutor {
         player.sendMessage(MessageUtil.info("/nation war <declare <n>|surrender>"));
         player.sendMessage(MessageUtil.info("/nation truce <propose <n>|accept>"));
         player.sendMessage(MessageUtil.info("/nation ally <propose <n>|accept>"));
+        player.sendMessage(MessageUtil.info("/nation build <ally_name> <true|false>"));
         player.sendMessage(MessageUtil.info("/nation toggle <multielement|refugees>"));
         player.sendMessage(MessageUtil.info("/nation element set <fire|water|earth|air|chi>"));
     }

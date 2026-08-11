@@ -29,8 +29,8 @@ public class NationManager {
     public int createNation(String name, UUID leaderUuid, Location coreLocation) {
         Connection conn = plugin.getDatabaseManager().getConnection();
         long now = System.currentTimeMillis();
-        int gracePeriodDays = plugin.getConfig().getInt("nation-creation.grace-period-days", 7);
-        long gracePeriodEnd = now + (gracePeriodDays * 24L * 60 * 60 * 1000);
+        long gracePeriodMinutes = plugin.getConfig().getLong("nation-creation.grace-period-minutes", 30);
+        long gracePeriodEnd = now + (gracePeriodMinutes * 60L * 1000L);
 
         try (PreparedStatement stmt = conn.prepareStatement(
                 "INSERT INTO nations (name, leader_uuid, creation_timestamp, grace_period_end) VALUES (?, ?, ?, ?)",
@@ -343,6 +343,11 @@ public class NationManager {
         return false;
     }
 
+    public boolean isPlayerNationInGracePeriod(UUID playerUuid) {
+        Integer nationId = getPlayerNation(playerUuid);
+        return nationId != null && isInGracePeriod(nationId);
+    }
+
     public boolean getAllowMultiElement(int nationId) {
         Connection conn = plugin.getDatabaseManager().getConnection();
         try (PreparedStatement stmt = conn.prepareStatement("SELECT allow_multi_element FROM nations WHERE id = ?")) {
@@ -427,7 +432,7 @@ public class NationManager {
         Integer nationId = getPlayerNation(player.getUniqueId());
         if (nationId == null) return;
         int level = getCitizenStrengthLevel(nationId);
-        org.bukkit.attribute.AttributeInstance attr = player.getAttribute(org.bukkit.attribute.Attribute.GENERIC_MAX_HEALTH);
+        org.bukkit.attribute.AttributeInstance attr = player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
         if (attr == null) return;
         org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, "nation.strength." + nationId);
         attr.getModifiers().stream()
@@ -479,10 +484,44 @@ public class NationManager {
 
     public int getMaxClaims(int nationId) {
         int base = plugin.getConfig().getInt("claiming.chunks-per-nation", 5);
+        int perMember = plugin.getConfig().getInt("claiming.chunks-per-member", 1);
         int perUpgrade = plugin.getConfig().getInt("claiming.extra-chunks-per-upgrade", 2);
         int maxTotal = plugin.getConfig().getInt("claiming.max-total-chunks", 15);
         int upgradeLevel = getShieldLevel(nationId);
-        return Math.min(base + (upgradeLevel * perUpgrade), maxTotal);
+        return Math.min(base + (getNationCitizens(nationId).size() * perMember) + (upgradeLevel * perUpgrade), maxTotal);
+    }
+
+    public boolean isAllied(int firstNationId, int secondNationId) {
+        try (PreparedStatement stmt = plugin.getDatabaseManager().getConnection().prepareStatement(
+                "SELECT 1 FROM nation_alliances WHERE status = 'active' AND ((nation_1_id = ? AND nation_2_id = ?) OR (nation_1_id = ? AND nation_2_id = ?)) LIMIT 1")) {
+            stmt.setInt(1, firstNationId); stmt.setInt(2, secondNationId);
+            stmt.setInt(3, secondNationId); stmt.setInt(4, firstNationId);
+            return stmt.executeQuery().next();
+        } catch (SQLException e) { return false; }
+    }
+
+    public void setAllyBuildPermission(int ownerNationId, int allyNationId, boolean allowed) {
+        Connection conn = plugin.getDatabaseManager().getConnection();
+        try (PreparedStatement statement = conn.prepareStatement(allowed
+                ? "INSERT OR IGNORE INTO nation_build_permissions (owner_nation_id, allowed_nation_id) VALUES (?, ?)"
+                : "DELETE FROM nation_build_permissions WHERE owner_nation_id = ? AND allowed_nation_id = ?")) {
+            statement.setInt(1, ownerNationId); statement.setInt(2, allyNationId); statement.executeUpdate();
+        } catch (SQLException e) { plugin.getLogger().warning("Could not save nation build permission: " + e.getMessage()); }
+        plugin.getWorldGuardIntegration().updateNationMembers(ownerNationId);
+    }
+
+    public List<Integer> getBuildAllowedAllies(int ownerNationId) {
+        List<Integer> result = new ArrayList<>();
+        try (PreparedStatement stmt = plugin.getDatabaseManager().getConnection().prepareStatement(
+                "SELECT allowed_nation_id FROM nation_build_permissions WHERE owner_nation_id = ?")) {
+            stmt.setInt(1, ownerNationId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                int ally = rs.getInt(1);
+                if (isAllied(ownerNationId, ally)) result.add(ally);
+            }
+        } catch (SQLException e) { plugin.getLogger().warning("Could not load nation build permissions: " + e.getMessage()); }
+        return result;
     }
 
     public int getShieldLevel(int nationId) {
@@ -583,7 +622,7 @@ public class NationManager {
     }
 
     public int incrementCoreHits(int nationId) {
-        int maxDurability = plugin.getConfig().getInt("core.durability", 20);
+        int maxDurability = getCoreDurability(nationId);
         Connection conn = plugin.getDatabaseManager().getConnection();
         try (PreparedStatement stmt = conn.prepareStatement(
                 "INSERT INTO nation_core_hits (nation_id, hit_count, last_hit_timestamp) VALUES (?, 1, ?) " +
@@ -597,6 +636,12 @@ public class NationManager {
             plugin.getLogger().severe("Failed to increment core hits: " + e.getMessage());
         }
         return getCoreHits(nationId);
+    }
+
+    public int getCoreDurability(int nationId) {
+        int base = plugin.getConfig().getInt("core.base-durability", plugin.getConfig().getInt("core.durability", 20));
+        int perUpgrade = plugin.getConfig().getInt("core.durability-per-upgrade", 10);
+        return Math.max(1, base + (getShieldLevel(nationId) * perUpgrade));
     }
 
     public void resetCoreHits(int nationId) {

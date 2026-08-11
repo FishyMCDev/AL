@@ -15,9 +15,8 @@ public class ProjectKorraIntegration {
 
     private final AvatarLegacy plugin;
     private final boolean enabled;
-    private final boolean scrollsEnabled;
 
-    
+
     private static final Map<String, String> ELEMENT_PREFIX_OVERRIDE = new HashMap<>();
     static {
         ELEMENT_PREFIX_OVERRIDE.put("fire",  "\u00a7c\u00a7lFire");
@@ -31,13 +30,11 @@ public class ProjectKorraIntegration {
     public ProjectKorraIntegration(AvatarLegacy plugin) {
         this.plugin = plugin;
         this.enabled = Bukkit.getPluginManager().isPluginEnabled("ProjectKorra");
-        this.scrollsEnabled = Bukkit.getPluginManager().isPluginEnabled("ProjectKorraScrolls");
     }
 
     public boolean isEnabled()        { return enabled; }
-    public boolean isScrollsEnabled() { return scrollsEnabled; }
 
-    
+
     public String getElementPrefixOverride(String element) {
         if (element == null) return null;
         return ELEMENT_PREFIX_OVERRIDE.get(element.toLowerCase());
@@ -67,6 +64,22 @@ public class ProjectKorraIntegration {
             case "air"   -> bPlayer.addElement(Element.AIR);
             case "chi"   -> bPlayer.addElement(Element.CHI);
         }
+    }
+
+    /**
+     * True if the player currently holds the named ProjectKorra sub-element
+     * (e.g. "Lightning", "Bloodbending", "Metalbending") on their live
+     * BendingPlayer sub-element set. Used to gate skill-tree unlocks for
+     * sub-element-only moves.
+     */
+    public boolean hasSubElement(Player player, String subelementName) {
+        if (!enabled || player == null || subelementName == null) return false;
+        BendingPlayer bPlayer = BendingPlayer.getBendingPlayer(player);
+        if (bPlayer == null) return false;
+        for (Element.SubElement sub : bPlayer.getSubElements()) {
+            if (sub.getName().equalsIgnoreCase(subelementName)) return true;
+        }
+        return false;
     }
 
     public void addAllElements(Player player) {
@@ -108,7 +121,10 @@ public class ProjectKorraIntegration {
         if (bPlayer == null) return;
 
         List<String> defaultMoves = plugin.getConfig()
-                .getStringList("protected-default-moves." + element.toLowerCase());
+                .getStringList("protected-default-moves." + element.toLowerCase())
+                .stream()
+                .filter(move -> move != null && !move.isBlank())
+                .collect(java.util.stream.Collectors.toList());
 
         if (defaultMoves.isEmpty()) {
             plugin.getLogger().warning("[AvatarLegacy] No default moves configured for element: "
@@ -117,40 +133,25 @@ public class ProjectKorraIntegration {
             return;
         }
 
-        
-        
-        
-        if (!scrollsEnabled) {
-            Map<Integer, String> slots = bPlayer.getAbilities();
-            for (int i = 0; i < defaultMoves.size() && i < 9; i++) {
-                String moveName = defaultMoves.get(i);
-                slots.put(i + 1, moveName);
-                plugin.getLuckPermsIntegration().grantPermission(
-                        player.getUniqueId(), "bending.ability." + moveName.toLowerCase());
-            }
+        Map<Integer, String> slots = bPlayer.getAbilities();
+        for (int i = 0; i < defaultMoves.size() && i < 9; i++) {
+            String moveName = defaultMoves.get(i);
+            slots.put(i + 1, moveName);
+            plugin.getLuckPermsIntegration().grantPermission(
+                    player.getUniqueId(), "bending.ability." + moveName.toLowerCase());
         }
     }
 
     public void unlearnAbility(Player player, String abilityName) {
         if (player == null) return;
-        if (scrollsEnabled) {
-            
-            plugin.getScrollManager().resetScrollProgress(player, abilityName);
-        } else {
-            plugin.getLuckPermsIntegration().revokePermission(
-                    player.getUniqueId(), "bending.ability." + abilityName.toLowerCase());
-        }
+        plugin.getLuckPermsIntegration().revokePermission(
+                player.getUniqueId(), "bending.ability." + abilityName.toLowerCase());
     }
 
     public void relearnAbility(Player player, String abilityName) {
         if (player == null) return;
-        if (scrollsEnabled) {
-            
-            plugin.getScrollManager().giveScrollForRestore(player, abilityName);
-        } else {
-            plugin.getLuckPermsIntegration().grantPermission(
-                    player.getUniqueId(), "bending.ability." + abilityName.toLowerCase());
-        }
+        plugin.getLuckPermsIntegration().grantPermission(
+                player.getUniqueId(), "bending.ability." + abilityName.toLowerCase());
     }
 
     public void clearAllAbilities(java.util.UUID uuid) {

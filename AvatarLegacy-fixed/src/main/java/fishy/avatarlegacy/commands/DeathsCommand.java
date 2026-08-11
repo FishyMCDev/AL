@@ -22,7 +22,7 @@ public class DeathsCommand implements CommandExecutor {
             return true;
         }
 
-        if (CommandUtil.requiresCharacter(plugin, player)) return true;
+        if (CommandUtil.requiresProfile(plugin, player)) return true;
 
         int deaths = plugin.getStatsManager().getDeathCount(player.getUniqueId());
         player.sendMessage(MessageUtil.info("Total deaths: " + deaths));

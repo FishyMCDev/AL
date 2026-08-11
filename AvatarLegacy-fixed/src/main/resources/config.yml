@@ -1,33 +1,11 @@
 database:
   path: "plugins/AvatarLegacy/avatarlegacy.db"
-spawn-locations:
-  spawn-realm:
-    world: "world"
-    x: 0
-    y: 72
-    z: 0
-  fire-ruins:
-    world: "world"
-    x: 843
-    y: 119
-    z: 539
-  water-ruins:
-    world: "world"
-    x: 2898
-    y: 64
-    z: -1736
-  earth-ruins:
-    world: "world"
-    x: -346
-    y: 68
-    z: 1526
-  air-ruins:
-    world: "world"
-    x: 658
-    y: 109
-    z: 2735
 
-# AFK kicking is disabled, set to 0 to never kick
+compatibility:
+  jedcore:
+    disable-recursive-damage-listener: false
+
+# AFK kicking, set to 0 to never kick
 afk:
   kick-after-minutes: 0
 
@@ -35,109 +13,65 @@ chi:
   spawn-radius: 10000
   spawn-world: "world"
 
-element-territories:
-  fire:
-    world: "world"
-    min-x: 900
-    max-x: 1100
-    min-z: -100
-    max-z: 100
-  water:
-    world: "world"
-    min-x: -1100
-    max-x: -900
-    min-z: -100
-    max-z: 100
-  earth:
-    world: "world"
-    min-x: -100
-    max-x: 100
-    min-z: 900
-    max-z: 1100
-  air:
-    world: "world"
-    min-x: -100
-    max-x: 100
-    min-z: -1100
-    max-z: -900
-
-scrolls:
-  unlock-count: 1
-  move-costs:
-    FireBlast: 1
-    FireJet: 1
-    FireShield: 1
-    Torrent: 1
-    WaterSpout: 1
-    Surge: 1
-    AirSuction: 3
-    AirSwipe: 1
-    Tornado: 3
-    EarthBlast: 1
-    Catapult: 1
-    Shockwave: 1
-    QuickStrike: 2
-    AcrobatStance: 3
-    Smokescreen: 5
-
 protected-default-moves:
   fire: ["FireBlast", "FireJet", "FireShield"]
-  water: ["WaterManipulation", "WaterSpout", "Torrent"]
-  air: ["AirSpout", "AirSwipe", "AirBlast"]
+  water: ["Torrent", "WaterSpout", "Surge"]
+  air: ["AirSuction", "AirSwipe", "Tornado"]
   earth: ["EarthBlast", "Catapult", "Shockwave"]
-  chi: ["QuickStrike", "SwiftKick", "HighJump"]
+  chi: ["QuickStrike", "AcrobatStance", "Smokescreen"]
+
+combo-moves:
+  - "Cyclone"
+  - "StormCloud"
+  - "BlazingSmash"
+  - "Cinderfall"
+  - "HydroConduction"
+  - "SeismicSlam"
+  - "Shatterstrike"
+  - "SinkingGrip"
+  - "SteamBurst"
+  - "VaporSurge"
 
 element-selection:
   timer-hours: 2
   choose-cooldown-seconds: 60
 
 custom-xp:
+  notify-messages: true
   per-kill: 1
   per-death: -1
   playtime-interval-minutes: 30
   per-playtime-interval: 5
+  sources:
+    kill: { enabled: true, amount: 10, repetitions-per-xp: 1 }
+    death: { enabled: true, amount: -20, repetitions-per-xp: 1 }
+    playtime: { enabled: true, amount: 5, repetitions-per-xp: 1 }
+    block-break: { enabled: true, amount: 5, repetitions-per-xp: 1000}
+    block-place: { enabled: true, amount: 5, repetitions-per-xp: 1000 }
+    damage-dealt: { enabled: true, amount: 1, repetitions-per-xp: 100 }
+    ability-damage: { enabled: true, amount: 10, repetitions-per-xp: 1000 }
+    eat: { enabled: true, amount: 1, repetitions-per-xp: 25 }
+    nation-leader-daily: { enabled: true, amount: 10, repetitions-per-xp: 1 }
+    nation-3plus-daily: { enabled: true, amount: 5, repetitions-per-xp: 1 }
+    fish-catch: { enabled: true, amount: 1, repetitions-per-xp: 8 }
+    tame: { enabled: true, amount: 2, repetitions-per-xp: 1 }
+    harvest: { enabled: true, amount: 1, repetitions-per-xp: 70 }
+
+ability-damage-modifiers:
+  abilities: {}
 
 xp-conversion:
-  yen-per-xp: 100
+  yen-per-xp: 150
 
 currency:
-  name: "Yen"
-  symbol: "¥"
+  name: Yen
+  symbol: ¥
   starting-balance: 1000
-
-shop:
-  gui-title: "Server Shop"
-  items:
-    wheat:
-      material: WHEAT
-      buy-price: 50
-      sell-price: 10
-      sellable: true
-    cobblestone:
-      material: COBBLESTONE
-      buy-price: 5
-      sell-price: 1
-      sellable: true
-    oak_log:
-      material: OAK_LOG
-      buy-price: 20
-      sell-price: 5
-      sellable: true
-    iron_ingot:
-      material: IRON_INGOT
-      buy-price: 200
-      sell-price: 50
-      sellable: true
-    diamond:
-      material: DIAMOND
-      buy-price: 1000
-      sell-price: 250
-      sellable: true
 
 transaction-logging: true
 death-logging: true
 
-character:
+player-profile:
   deletion-cooldown-days: 7
   delete-items-on-deletion: true
   death-ban-days: 1
@@ -145,50 +79,57 @@ character:
 debuffs:
   bending-strength-reduction-per-death: 5
   minimum-bending-strength: 50
-  max-moves-removable: 5
+  max-moves-removable: 0
 
 bending-spirit:
   max-deaths: 30
-  restore-cost-xp: 5000
-  restore-cost-yen: 100000
+  avatar-max-deaths: 3
+  restore-cost-xp: 100
+  restore-cost-yen: 10000
   max-restores: -1
   restore-cooldown-hours: 24
 
 restoration:
   bending-strength-restore-cost-xp: 100
-  bending-strength-restore-cost-yen: 50000
-  move-restore-cost-xp: 50
-  move-restore-cost-yen: 25000
+  bending-strength-restore-cost-yen: 10000
+  move-restore-cost-xp: 0
+  move-restore-cost-yen: 0
 
 nation-creation:
   costs:
-    wood-stacks: 5
-    cobblestone-stacks: 5
-    xp-levels: 5
+    wood-stacks: 10
+    cobblestone-stacks: 10
+    xp-levels: 10
     playtime-minutes: 30
-  grace-period-days: 7
+  grace-period-minutes: 30
 
 core:
   min-y-level: 62
   max-distance-from-spawn: 10
   max-underground-depth: 5
-  durability: 20
+  base-durability: 20
+  durability-per-upgrade: 10
   hit-reset-minutes: 10
   shield-duration-minutes: 60
   shield-cooldown-hours: 6
 
 citizenship:
-  kick-cooldown-minutes: 5
+  kick-cooldown-minutes: 1
 
 taxes:
-  collection-time: "00:00"
+  collection-time: 12:00
   max-rate-percent: 50
 
 claiming:
   chunks-per-nation: 5
+  chunks-per-member: 1
   extra-chunks-per-upgrade: 2
   cost-per-chunk: 5000
   max-total-chunks: 15
+
+death-system:
+  # Deaths inside this period are recorded but do not cost bending spirit.
+  count-gap-minutes: 10
 
 upgrades:
   resource-drop-rate:
@@ -205,22 +146,82 @@ upgrades:
     level-3-cost: 400000
 
 avatar:
-  cycle-order: ["fire", "air", "water", "earth"]
+  cycle-order:
+    - fire
+    - air
+    - water
+    - earth
   reincarnation-period-days: 7
   global-debuff-during-reincarnation: 10
   score:
-    playtime-cap-hours: 24
+    playtime-cap-hours: 250
+    # Caps how much raw bending-damage-dealt is shown/weighted as the damage score.
+    damage-cap: 10000
   first-avatar:
-    min-playtime-hours: 5
+    min-playtime-hours: 4
 
 element-changer:
-  item-name: "&5&lElement Changer"
+  item-name: '&5&lElement Changer'
   item-lore:
-    - "&7Right-click to change your permanent element."
-    - "&7One use only."
+    - '&7Right-click to change your permanent element.'
+    - '&7One use only.'
   announce-change: true
+  # Nexooo
+  nexo-id: ''
+  # Percentage chance (0-100)
+  chance-in-structure: 0.005
 
 teleport:
   delay-seconds: 10
   cooldown-seconds: 10
   command-cooldown-seconds: 5
+
+skill-tree:
+  remove-move-on-death: false
+
+# Every ProjectKorra subelement is added here automatically on first start. Values are percentages.
+traits:
+  chances:
+    water:
+      Ice: 50.0
+      Blood: 30.0
+      Healing: 90.0
+      Plant: 60.0
+      Steam: 70.0
+    earth:
+      Lava: 50.0
+      Metal: 50.0
+      Sand: 70.0
+    fire:
+      Lightning: 80.0
+      Combustion: 80.0
+      BlueFire: 50.0
+    air:
+      Flight: 80.0
+      Spiritual: 0.0
+      Sound: 50.0
+
+
+subelement-access-items:
+  enabled: true
+  # Optional Nexo id. Empty means the item is not supplied by Nexo.
+  example:
+    subelement: Ice
+    nexo-id: ''
+    material: PRISMARINE_CRYSTALS
+    name: '&bIce Bending Scroll'
+    lore:
+      - '&7Grants the Ice subelement trait.'
+    # Percentage chance (0-100) this item is added to a structure chest. Keep this low.
+    chance-in-structure: 0.005
+
+web-editor:
+  enabled: true
+  port: 67
+
+# Teaching
+teaching:
+  min-teacher-playtime-hours: 4
+  close-distance-blocks: 5
+  break-distance-blocks: 90
+  duration-seconds: 90

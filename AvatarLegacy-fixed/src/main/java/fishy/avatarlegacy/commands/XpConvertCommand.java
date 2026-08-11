@@ -24,11 +24,11 @@ public class XpConvertCommand implements CommandExecutor {
             return true;
         }
 
-        if (CommandUtil.requiresCharacter(plugin, player)) return true;
+        if (CommandUtil.requiresProfile(plugin, player)) return true;
 
         PlayerData data = plugin.getPlayerDataManager().getPlayerData(player.getUniqueId());
         if (data == null) {
-            player.sendMessage(MessageUtil.error("You do not have an active character!"));
+            player.sendMessage(MessageUtil.error("You do not have an active player profile!"));
             return true;
         }
 

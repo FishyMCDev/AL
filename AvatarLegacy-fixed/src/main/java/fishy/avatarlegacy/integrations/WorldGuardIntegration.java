@@ -63,7 +63,7 @@ public class WorldGuardIntegration {
 
             com.sk89q.worldguard.protection.managers.storage.StorageException ignored1 = null;
             try {
-                for (java.util.UUID citizenUuid : plugin.getNationManager().getNationCitizens(nationId)) {
+                for (java.util.UUID citizenUuid : getAllowedBuilders(nationId)) {
                     org.bukkit.OfflinePlayer op = org.bukkit.Bukkit.getOfflinePlayer(citizenUuid);
                     region.getMembers().addPlayer(op.getUniqueId());
                 }
@@ -167,7 +167,7 @@ public class WorldGuardIntegration {
     public void updateNationMembers(int nationId) {
         if (!enabled) return;
         try {
-            java.util.List<java.util.UUID> citizens = plugin.getNationManager().getNationCitizens(nationId);
+            java.util.List<java.util.UUID> citizens = getAllowedBuilders(nationId);
             RegionContainer container = WorldGuard.getInstance().getPlatform().getRegionContainer();
             for (World world : plugin.getServer().getWorlds()) {
                 RegionManager regions = container.get(BukkitAdapter.adapt(world));
@@ -190,6 +190,19 @@ public class WorldGuardIntegration {
         } catch (Exception e) {
             plugin.getLogger().severe("Failed to update nation members: " + e.getMessage());
         }
+    }
+
+    /** WorldGuard membership is the authoritative block protection: owners, citizens and explicitly permitted allies. */
+    private java.util.List<java.util.UUID> getAllowedBuilders(int nationId) {
+        java.util.LinkedHashSet<java.util.UUID> builders = new java.util.LinkedHashSet<>(plugin.getNationManager().getNationCitizens(nationId));
+        java.util.UUID leader = plugin.getNationManager().getNationLeader(nationId);
+        if (leader != null) builders.add(leader);
+        for (Integer allyId : plugin.getNationManager().getBuildAllowedAllies(nationId)) {
+            builders.addAll(plugin.getNationManager().getNationCitizens(allyId));
+            java.util.UUID allyLeader = plugin.getNationManager().getNationLeader(allyId);
+            if (allyLeader != null) builders.add(allyLeader);
+        }
+        return new java.util.ArrayList<>(builders);
     }
 
     public void removeNationRegions(int nationId) {

@@ -2,21 +2,31 @@ package fishy.avatarlegacy.managers;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import com.projectkorra.projectkorra.Element;
+import com.projectkorra.projectkorra.ability.CoreAbility;
+import com.projectkorra.projectkorra.ability.PassiveAbility;
 import fishy.avatarlegacy.AvatarLegacy;
 import fishy.avatarlegacy.models.PlayerData;
 import org.bukkit.Bukkit;
-import fishy.avatarlegacy.managers.CharacterManager;
 import fishy.avatarlegacy.utils.MessageUtil;
 import org.bukkit.entity.Player;
+import fishy.avatarlegacy.skilltree.SkillTreeManager;
+import fishy.avatarlegacy.skilltree.SkillNode;
+import fishy.avatarlegacy.skilltree.PlayerSkillData;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class StatsManager {
@@ -24,11 +34,16 @@ public class StatsManager {
     private final AvatarLegacy plugin;
     private final Gson gson;
     private final Random random;
+    private final Map<UUID, Map<String, Integer>> xpSourceRemainders;
+    private final Map<UUID, Long> recentDeathProcessing;
+    private static final long DUPLICATE_DEATH_WINDOW_MS = 5_000L;
 
     public StatsManager(AvatarLegacy plugin) {
         this.plugin = plugin;
         this.gson = new Gson();
         this.random = new Random();
+        this.xpSourceRemainders = new ConcurrentHashMap<>();
+        this.recentDeathProcessing = new ConcurrentHashMap<>();
     }
 
     public void createStats(UUID uuid) {
@@ -47,6 +62,13 @@ public class StatsManager {
     
     public void handleDeath(Player player, String cause, String location) {
         UUID uuid = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        long last = recentDeathProcessing.getOrDefault(uuid, 0L);
+        long deathGap = plugin.getConfig().getLong("death-system.count-gap-minutes", 10) * 60_000L;
+        if (now - last < deathGap) {
+            return;
+        }
+        recentDeathProcessing.put(uuid, now);
         logDeath(uuid, cause, location);
 
         createStats(uuid);
@@ -65,19 +87,12 @@ public class StatsManager {
         incrementDeathCount(uuid);
 
         
-        int xpPerDeath = plugin.getConfig().getInt("custom-xp.per-death", -1);
-        if (xpPerDeath != 0 && data != null) {
-            int newXP = Math.max(0, data.getCustomXP() + xpPerDeath);
-            data.setCustomXP(newXP);
-        }
+        awardConfiguredXp(uuid, "death", 1);
 
         
         int currentDeaths = getDeathCount(uuid);
-        int maxDeaths     = plugin.getConfig().getInt("bending-spirit.max-deaths", 30);
+        int maxDeaths = getSpiritCap(uuid);
         if (currentDeaths >= maxDeaths) {
-            if (plugin.getAvatarManager().isAvatar(uuid)) {
-                return;
-            }
             final UUID fUuid = uuid;
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (player.isOnline()) plugin.getCharacterManager().deactivateCharacter(fUuid, "SPIRIT_BROKEN");
@@ -92,13 +107,13 @@ public class StatsManager {
                 if (!player.isOnline()) return;
                 if (fr == 3) {
                     player.sendMessage("§6§l⚠ Your bending spirit is weakening!");
-                    player.sendMessage("§e§lOnly " + fr + " deaths remain before your character is lost forever!");
+                    player.sendMessage("§e§lOnly " + fr + " deaths remain before your profile is lost forever!");
                 } else if (fr == 2) {
                     player.sendMessage("§c§l⚠⚠ CRITICAL: Your bending spirit is nearly broken!");
                     player.sendMessage("§c§lOnly " + fr + " deaths remain. Choose your battles wisely!");
                 } else if (fr == 1) {
                     player.sendMessage("§4§l☠ ☠ ☠  F I N A L  W A R N I N G  ☠ ☠ ☠");
-                    player.sendMessage("§4§lONE MORE DEATH and your character is PERMANENTLY DESTROYED!");
+                    player.sendMessage("§4§lONE MORE DEATH and your profile is PERMANENTLY DESTROYED!");
                 }
             }, 80L);
         }
@@ -132,6 +147,16 @@ public class StatsManager {
         removeRandomMove(player);
     }
 
+    public int getSpiritCap(UUID uuid) {
+        return plugin.getAvatarManager().isAvatar(uuid)
+                ? plugin.getConfig().getInt("bending-spirit.avatar-max-deaths", 3)
+                : plugin.getConfig().getInt("bending-spirit.max-deaths", 30);
+    }
+
+    public boolean isSpiritBroken(UUID uuid) {
+        return getDeathCount(uuid) >= getSpiritCap(uuid);
+    }
+
     private void removeRandomMove(Player player) {
         UUID uuid = player.getUniqueId();
         int movesRemoved = getMovesRemoved(uuid);
@@ -145,53 +170,26 @@ public class StatsManager {
                 .stream().map(String::toLowerCase).collect(Collectors.toList());
         List<String> alreadyRemoved = getRemovedMoves(uuid)
                 .stream().map(String::toLowerCase).collect(Collectors.toList());
-
         
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        boolean scrollsEnabled = plugin.getProjectKorraIntegration().isScrollsEnabled();
-        List<String> learnedMoves;
-        if (scrollsEnabled) {
-            com.projectkorra.projectkorra.BendingPlayer bPlayer =
-                    com.projectkorra.projectkorra.BendingPlayer.getBendingPlayer(player);
-            if (bPlayer == null) return;
-            
-            java.util.Set<String> learnedSet = new java.util.LinkedHashSet<>();
-            
-            for (String ability : bPlayer.getAbilities().values()) {
-                if (ability != null && !ability.isEmpty()) {
-                    learnedSet.add(ability.toLowerCase());
-                }
-            }
-            
-            for (String prev : alreadyRemoved) {
-                if (prev != null && !prev.isEmpty()) {
-                    learnedSet.add(prev.toLowerCase());
-                }
-            }
-            learnedMoves = new java.util.ArrayList<>(learnedSet);
-        } else {
-            
-            learnedMoves = plugin.getLuckPermsIntegration().getLearnedAbilities(uuid)
-                    .stream().map(String::toLowerCase).collect(Collectors.toList());
+        PlayerData data = plugin.getPlayerDataManager().getPlayerData(uuid);
+        if (data == null || data.getElement() == null) {
+            return;
         }
 
-        List<String> available = new ArrayList<>(learnedMoves);
-        available.removeAll(protectedMoves);
-        available.removeAll(alreadyRemoved);
+        Set<String> candidateMoves = new LinkedHashSet<>();
+        List<String> elements = new ArrayList<>();
+        if (plugin.getAvatarManager().isAvatar(uuid)) {
+            elements.addAll(List.of("fire", "water", "earth", "air"));
+        } else {
+            elements.add(data.getElement());
+        }
+        candidateMoves.addAll(plugin.getLuckPermsIntegration().getLearnedAbilities(uuid));
+
+        List<String> available = new ArrayList<>(candidateMoves);
+        available.removeIf(move -> containsIgnoreCase(protectedMoves, move));
+        available.removeIf(move -> containsIgnoreCase(alreadyRemoved, move));
+        available.removeIf(move -> elements.stream().noneMatch(element -> isMoveForElement(move, element)));
+        available.removeIf(move -> !isBindableProjectKorraMove(move));
 
         if (available.isEmpty()) {
                 return;
@@ -204,12 +202,19 @@ public class StatsManager {
         if (ca != null) moveToRemove = ca.getName();
 
         plugin.getProjectKorraIntegration().removeAbilityFromSlot(player, moveToRemove);
-        if (scrollsEnabled) {
-            plugin.getScrollManager().resetScrollProgress(player, moveToRemove);
-        } else {
-            plugin.getProjectKorraIntegration().unlearnAbility(player, moveToRemove);
-            plugin.getLuckPermsIntegration().revokePermission(uuid, "bending.ability." + moveToRemove.toLowerCase());
+        plugin.getProjectKorraIntegration().unlearnAbility(player, moveToRemove);
+
+        SkillTreeManager stm = plugin.getSkillTreeManager();
+        if (stm != null) {
+            String element = data.getElement();
+            SkillNode node = stm.getNodeByAbility(element, moveToRemove);
+            if (node != null) {
+                PlayerSkillData psd = stm.loadPlayerData(uuid);
+                psd.lockNode(element, node.getNodeId());
+                stm.savePlayerData(psd);
+            }
         }
+        plugin.getLuckPermsIntegration().revokePermission(uuid, "bending.ability." + moveToRemove.toLowerCase());
 
         alreadyRemoved.add(moveToRemove);
         setRemovedMoves(uuid, alreadyRemoved);
@@ -220,13 +225,34 @@ public class StatsManager {
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (player.isOnline()) {
                 player.sendMessage("§c§l☠ You lost access to §e" + fm + "§c due to your death!");
-                if (plugin.getProjectKorraIntegration().isScrollsEnabled()) {
-                    player.sendMessage("§7Find a scroll to re-learn it, or restore it via §e/stats§7.");
-                } else {
-                    player.sendMessage("§7You can restore it via §e/stats§7.");
-                }
+                player.sendMessage("§7You can restore it via §e/stats§7.");
             }
         }, 40L);
+    }
+
+    private boolean isMoveForElement(String moveName, String element) {
+        if (moveName == null || element == null) return false;
+        CoreAbility ability = CoreAbility.getAbility(moveName);
+        if (ability == null || ability.getElement() == null) return false;
+        Element abilityElement = ability.getElement();
+        String abilityElementName = abilityElement instanceof Element.SubElement subElement
+                ? subElement.getParentElement().getName()
+                : abilityElement.getName();
+        return abilityElementName.equalsIgnoreCase(element);
+    }
+
+    private boolean isBindableProjectKorraMove(String moveName) {
+        if (moveName == null || moveName.isBlank()) return false;
+        CoreAbility ability = CoreAbility.getAbility(moveName);
+        return ability != null && ability.isEnabled() && !ability.isHiddenAbility() && !(ability instanceof PassiveAbility);
+    }
+
+    private boolean containsIgnoreCase(List<String> values, String needle) {
+        if (needle == null) return false;
+        for (String value : values) {
+            if (needle.equalsIgnoreCase(value)) return true;
+        }
+        return false;
     }
 
     public int getBendingStrength(UUID uuid) {
@@ -353,6 +379,16 @@ public class StatsManager {
         }
     }
 
+    public void clearRemovedMovePenalty(UUID uuid, String moveName) {
+        if (uuid == null || moveName == null || moveName.isBlank()) return;
+        List<String> removed = getRemovedMoves(uuid);
+        boolean changed = removed.removeIf(move -> move != null && move.equalsIgnoreCase(moveName));
+        if (!changed) return;
+        setRemovedMoves(uuid, removed);
+        setMovesRemoved(uuid, removed.size());
+        if (plugin.getBendingHook() != null) plugin.getBendingHook().invalidateCache(uuid);
+    }
+
     public void restoreBendingStrength(UUID uuid) {
         setBendingStrength(uuid, 100);
     }
@@ -373,13 +409,7 @@ public class StatsManager {
 
         Player player = Bukkit.getPlayer(uuid);
         if (player != null) {
-            boolean scrollsEnabled = plugin.getProjectKorraIntegration().isScrollsEnabled();
-            if (scrollsEnabled) {
-                
-                plugin.getScrollManager().giveScrollForRestore(player, moveName);
-            } else {
-                plugin.getLuckPermsIntegration().grantPermission(uuid, "bending.ability." + moveName.toLowerCase());
-            }
+            plugin.getLuckPermsIntegration().grantPermission(uuid, "bending.ability." + moveName.toLowerCase());
 
             com.projectkorra.projectkorra.BendingPlayer bPlayer =
                     com.projectkorra.projectkorra.BendingPlayer.getBendingPlayer(player);
@@ -422,13 +452,7 @@ public class StatsManager {
         }
 
         
-        int xpPerKill = plugin.getConfig().getInt("custom-xp.per-kill", 1);
-        if (xpPerKill != 0) {
-            fishy.avatarlegacy.models.PlayerData data = plugin.getPlayerDataManager().getPlayerData(uuid);
-            if (data != null) {
-                data.addCustomXP(xpPerKill);
-            }
-        }
+        awardConfiguredXp(uuid, "kill", 1);
     }
 
     public void addProjectKorraDamageDealt(UUID uuid, double damage) {
@@ -469,6 +493,7 @@ public class StatsManager {
         } catch (SQLException e) {
             plugin.getLogger().severe("Failed to increment blocks broken: " + e.getMessage());
         }
+        awardConfiguredXp(uuid, "block-break", 1);
     }
 
     public void incrementBlocksPlaced(UUID uuid) {
@@ -481,6 +506,7 @@ public class StatsManager {
         } catch (SQLException e) {
             plugin.getLogger().severe("Failed to increment blocks placed: " + e.getMessage());
         }
+        awardConfiguredXp(uuid, "block-place", 1);
     }
 
     public long getBlocksBroken(UUID uuid) {
@@ -515,15 +541,8 @@ public class StatsManager {
         if (plugin.getBendingHook() != null) plugin.getBendingHook().invalidateCache(uuid);
         List<String> removed = new ArrayList<>(getRemovedMoves(uuid));
         Player player = Bukkit.getPlayer(uuid);
-        boolean scrollsEnabled = plugin.getProjectKorraIntegration().isScrollsEnabled();
         for (String move : removed) {
-            if (scrollsEnabled) {
-                if (player != null) {
-                    plugin.getScrollManager().giveScrollForRestore(player, move);
-                }
-            } else {
-                plugin.getLuckPermsIntegration().grantPermission(uuid, "bending.ability." + move.toLowerCase());
-            }
+            plugin.getLuckPermsIntegration().grantPermission(uuid, "bending.ability." + move.toLowerCase());
             if (player != null) {
                 com.projectkorra.projectkorra.BendingPlayer bPlayer =
                         com.projectkorra.projectkorra.BendingPlayer.getBendingPlayer(player);
@@ -649,6 +668,63 @@ public class StatsManager {
         }
     }
 
+    public void awardConfiguredXp(UUID uuid, String source, int multiplier) {
+        PlayerData data = plugin.getPlayerDataManager().getPlayerData(uuid);
+        if (data == null) return;
+        String basePath = "custom-xp.sources." + source;
+        String amountPath = basePath + ".amount";
+        if (!plugin.getConfig().getBoolean(basePath + ".enabled", true)) return;
+        int repetitionsPerXp = Math.max(1, plugin.getConfig().getInt(basePath + ".repetitions-per-xp", 1));
+        int base = plugin.getConfig().contains(amountPath) ? plugin.getConfig().getInt(amountPath, 0) : getLegacyXpSource(source);
+        if (base == 0) return;
+        int eventCount = Math.max(1, multiplier);
+
+        int amountUnits;
+        if (repetitionsPerXp <= 1) {
+            amountUnits = eventCount;
+        } else {
+            Map<String, Integer> perSource = xpSourceRemainders.computeIfAbsent(uuid, k -> new HashMap<>());
+            int carried = perSource.getOrDefault(source, 0);
+            int total = carried + eventCount;
+            amountUnits = total / repetitionsPerXp;
+            int remainder = total % repetitionsPerXp;
+            if (remainder > 0) {
+                perSource.put(source, remainder);
+            } else {
+                perSource.remove(source);
+                if (perSource.isEmpty()) {
+                    xpSourceRemainders.remove(uuid);
+                }
+            }
+        }
+
+        if (amountUnits <= 0) return;
+        int before = data.getCustomXP();
+        int amount = base * amountUnits;
+        int after = Math.max(0, before + amount);
+        int applied = after - before;
+        if (applied == 0) return;
+        data.setCustomXP(after);
+
+        if (plugin.getConfig().getBoolean("custom-xp.notify-messages", true)) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null && player.isOnline()) {
+                String prettySource = source.replace('-', ' ');
+                String sign = applied > 0 ? "+" : "";
+                player.sendMessage("§6[XP] §7" + sign + applied + " XP §8(" + prettySource + ")");
+            }
+        }
+    }
+
+    private int getLegacyXpSource(String source) {
+        return switch (source.toLowerCase()) {
+            case "kill" -> plugin.getConfig().getInt("custom-xp.per-kill", 1);
+            case "death" -> plugin.getConfig().getInt("custom-xp.per-death", -1);
+            case "playtime" -> plugin.getConfig().getInt("custom-xp.per-playtime-interval", 5);
+            default -> 0;
+        };
+    }
+
     private void logDeath(UUID uuid, String cause, String location) {
         if (!plugin.getConfig().getBoolean("death-logging", true)) return;
         Connection conn = plugin.getDatabaseManager().getConnection();
@@ -661,6 +737,31 @@ public class StatsManager {
             stmt.executeUpdate();
         } catch (SQLException e) {
             plugin.getLogger().severe("Failed to log death: " + e.getMessage());
+        }
+    }
+
+    public int getDeathbanCount(UUID uuid) {
+        Connection conn = plugin.getDatabaseManager().getConnection();
+        try (PreparedStatement stmt = conn.prepareStatement(
+                "SELECT deathban_count FROM player_penalties WHERE uuid = ?")) {
+            stmt.setString(1, uuid.toString());
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) return rs.getInt("deathban_count");
+        } catch (SQLException e) {
+            plugin.getLogger().warning("Failed to get deathban count: " + e.getMessage());
+        }
+        return 0;
+    }
+
+    public void incrementDeathbanCount(UUID uuid) {
+        Connection conn = plugin.getDatabaseManager().getConnection();
+        try (PreparedStatement stmt = conn.prepareStatement(
+                "INSERT INTO player_penalties (uuid, deathban_count) VALUES (?, 1) " +
+                        "ON CONFLICT(uuid) DO UPDATE SET deathban_count = deathban_count + 1")) {
+            stmt.setString(1, uuid.toString());
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getLogger().warning("Failed to increment deathban count: " + e.getMessage());
         }
     }
 }

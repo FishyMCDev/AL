@@ -22,7 +22,7 @@ public class BalanceCommand implements CommandExecutor {
             return true;
         }
 
-        if (CommandUtil.requiresCharacter(plugin, player)) return true;
+        if (CommandUtil.requiresProfile(plugin, player)) return true;
 
         double balance = plugin.getEconomyManager().getBalance(player.getUniqueId());
         player.sendMessage(MessageUtil.info("Your balance: " + MessageUtil.formatYen(balance)));

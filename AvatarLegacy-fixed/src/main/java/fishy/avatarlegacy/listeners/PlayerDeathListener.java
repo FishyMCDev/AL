@@ -8,8 +8,14 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
 public class PlayerDeathListener implements Listener {
     private final AvatarLegacy plugin;
+    private final Map<UUID, Long> recentDeaths = new ConcurrentHashMap<>();
+    private static final long DUPLICATE_DEATH_WINDOW_MS = 5_000L;
 
     public PlayerDeathListener(AvatarLegacy plugin) {
         this.plugin = plugin;
@@ -18,6 +24,13 @@ public class PlayerDeathListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        Long last = recentDeaths.put(uuid, now);
+        if (last != null && now - last < DUPLICATE_DEATH_WINDOW_MS) {
+            event.setDeathMessage(null);
+            return;
+        }
 
         event.setDeathMessage(null);
 
@@ -27,7 +40,8 @@ public class PlayerDeathListener implements Listener {
 
         plugin.getStatsManager().handleDeath(player, cause, location);
 
-        if (plugin.getAvatarManager().isAvatar(player.getUniqueId())) {
+        // An Avatar only loses the cycle once their special, three-spirit reserve is exhausted.
+        if (plugin.getAvatarManager().isAvatar(uuid) && plugin.getStatsManager().isSpiritBroken(uuid)) {
             plugin.getAvatarManager().handleAvatarDeath(player);
         }
     }

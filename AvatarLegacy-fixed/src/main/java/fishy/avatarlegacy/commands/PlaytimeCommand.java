@@ -23,7 +23,7 @@ public class PlaytimeCommand implements CommandExecutor {
             return true;
         }
 
-        if (CommandUtil.requiresCharacter(plugin, player)) return true;
+        if (CommandUtil.requiresProfile(plugin, player)) return true;
 
         PlayerData data = plugin.getPlayerDataManager().getPlayerData(player.getUniqueId());
 

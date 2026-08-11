@@ -60,7 +60,7 @@ public class ElementChangerListener implements Listener {
 
         PlayerData data = plugin.getPlayerDataManager().getPlayerData(player.getUniqueId());
         if (data == null) {
-            player.sendMessage(MessageUtil.error("You need an active character to use this!"));
+            player.sendMessage(MessageUtil.error("Your profile is still loading. Please try again."));
             return;
         }
 
@@ -121,7 +121,7 @@ public class ElementChangerListener implements Listener {
 
         PlayerData data = plugin.getPlayerDataManager().getPlayerData(player.getUniqueId());
         if (data == null) {
-            player.sendMessage(MessageUtil.error("No active character found."));
+            player.sendMessage(MessageUtil.error("No player profile found."));
             return;
         }
 
@@ -147,11 +147,9 @@ public class ElementChangerListener implements Listener {
         plugin.getElementManager().changeElementViaChanger(player, finalElement);
 
         if (plugin.getConfig().getBoolean("element-changer.announce-change", true)) {
-            String charName = plugin.getCharacterManager().getCachedCharacterName(player.getUniqueId());
-            String displayName = (charName != null && !charName.isBlank()) ? charName : player.getName();
             Bukkit.broadcast(
                 Component.text("\u2728 ", NamedTextColor.GOLD)
-                    .append(Component.text(displayName, NamedTextColor.YELLOW))
+                    .append(Component.text(player.getName(), NamedTextColor.YELLOW))
                     .append(Component.text(" has changed their element to ", NamedTextColor.WHITE))
                     .append(Component.text(finalElement.toUpperCase(), ELEMENT_COLORS[getElementIndex(finalElement)]))
                     .append(Component.text("!", NamedTextColor.WHITE))

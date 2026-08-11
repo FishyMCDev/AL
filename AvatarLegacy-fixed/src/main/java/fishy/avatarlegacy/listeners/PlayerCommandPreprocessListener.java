@@ -20,8 +20,7 @@ public class PlayerCommandPreprocessListener implements Listener {
 
     
     private static final Set<String> ALWAYS_ALLOWED = Set.of(
-            "/character", "/character create",
-            "/characterwho", "/charwho",
+            "/playerwho", "/player",
             "/help", "/login", "/register"
     );
 
@@ -57,7 +56,7 @@ public class PlayerCommandPreprocessListener implements Listener {
             if (message.equals(allowed) || message.startsWith(allowed + " ")) return;
         }
 
-        // While frozen (character creation / element selection), only allow /b choose
+        // While frozen (element selection), only allow /b choose
         if (plugin.getSkyFreezeManager().isFrozen(player.getUniqueId())) {
             boolean isChoose = message.equals("/b choose") || message.startsWith("/b choose ")
                     || message.equals("/bending choose") || message.startsWith("/bending choose ");
@@ -73,9 +72,20 @@ public class PlayerCommandPreprocessListener implements Listener {
         PlayerData data = plugin.getPlayerDataManager().getPlayerData(player.getUniqueId());
         if (data == null) {
             event.setCancelled(true);
-            player.sendMessage(MessageUtil.error("You do not have an active character!"));
-            player.sendMessage(MessageUtil.warning("Use \u00a7e/character create <n>\u00a76 to begin your journey."));
+            player.sendMessage(MessageUtil.error("Your profile is still loading. Try again in a moment."));
             return;
+        }
+
+        boolean isClear = message.equals("/b clear") || message.startsWith("/b clear ")
+                || message.equals("/bending clear") || message.startsWith("/bending clear ");
+        if (isClear) {
+            plugin.getElementManager().clearBendingSlots(player);
+        }
+
+        if (message.startsWith("/sell")) {
+            plugin.getStatsManager().awardConfiguredXp(player.getUniqueId(), "essentials-sell", 1);
+        } else if (message.startsWith("/buy") || message.startsWith("/shop buy")) {
+            plugin.getStatsManager().awardConfiguredXp(player.getUniqueId(), "essentials-buy", 1);
         }
 
         

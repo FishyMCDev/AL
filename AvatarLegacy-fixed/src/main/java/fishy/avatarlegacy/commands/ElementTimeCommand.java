@@ -22,7 +22,7 @@ public class ElementTimeCommand implements CommandExecutor {
             return true;
         }
 
-        if (CommandUtil.requiresCharacter(plugin, player)) return true;
+        if (CommandUtil.requiresProfile(plugin, player)) return true;
 
         long remaining = plugin.getElementManager().getTimeUntilPermanent(player.getUniqueId());
 

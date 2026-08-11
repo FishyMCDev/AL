@@ -1,0 +1,538 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Skill Tree Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root{
+            --bg:#12151b;
+            --panel:#1a1e26;
+            --panel-2:#20252f;
+            --line:#2c3240;
+            --text:#e9e6dc;
+            --muted:#8b93a3;
+            --gold:#d9a94e;
+            --gold-soft:#d9a94e33;
+            --bad:#d95f5f;
+            --slot-w:200px;
+            --slot-h:130px;
+            --node-size:64px;
+            --radius:8px;
+            --shadow:0 6px 16px rgba(0,0,0,.4);
+        }
+        *{box-sizing:border-box}
+        body{
+            font:14px/1.5 'Inter',system-ui,sans-serif;
+            margin:0;
+            background:
+                    radial-gradient(circle at 15% 0%, #1c2130 0%, transparent 45%),
+                    radial-gradient(circle at 85% 100%, #1a2420 0%, transparent 40%),
+                    var(--bg);
+            color:var(--text);
+            min-height:100vh;
+        }
+        header{
+            display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+            padding:20px 28px 16px;
+            border-bottom:1px solid var(--line);
+            position:relative;
+            z-index:50;
+            background:var(--bg);
+        }
+        h2{
+            font:700 22px/1 'Cinzel',serif;
+            letter-spacing:.03em;
+            margin:0;
+            color:var(--gold);
+            text-shadow:0 0 18px var(--gold-soft);
+        }
+        #status{
+            font:500 12px 'JetBrains Mono',monospace;
+            color:var(--muted);
+            padding:4px 10px;
+            border:1px solid var(--line);
+            border-radius:100px;
+            background:var(--panel);
+        }
+        #status.ok{color:#8fd98f;border-color:#2f4a34}
+        .bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:auto}
+        select,button{
+            font:500 13px 'Inter',sans-serif;
+            background:var(--panel-2);
+            color:var(--text);
+            border:1px solid var(--line);
+            border-radius:6px;
+            padding:8px 14px;
+            cursor:pointer;
+            transition:border-color .15s,background .15s;
+        }
+        select:hover,button:hover{border-color:var(--gold);background:#242a35}
+        button.primary{background:var(--gold);color:#1a1206;border-color:var(--gold);font-weight:600}
+        button.primary:hover{background:#e6b862}
+        .zoombar,.panbar{
+            display:flex;align-items:center;gap:6px;
+            padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);
+        }
+        .zoombar button,.panbar button{
+            padding:6px 10px;min-width:34px;text-align:center;
+        }
+        #zoomLabel{
+            font:500 12px 'JetBrains Mono',monospace;color:var(--muted);
+            min-width:42px;text-align:center;user-select:none;
+        }
+        .hint{
+            margin:12px 28px 0;
+            color:var(--muted);
+            font-size:12.5px;
+            max-width:900px;
+        }
+        .hint b{color:var(--text)}
+        main.canvas{
+            position:relative;
+            margin:16px 28px 28px;
+            height:640px;
+            background:
+                    linear-gradient(var(--line) 1px, transparent 1px) 0 0/var(--slot-w) var(--slot-h),
+                    linear-gradient(90deg, var(--line) 1px, transparent 1px) 0 0/var(--slot-w) var(--slot-h),
+                    var(--panel);
+            background-blend-mode:overlay;
+            border:1px solid var(--line);
+            border-radius:var(--radius);
+            overflow:auto;
+            overflow-x:auto;
+            overflow-y:auto;
+            box-shadow:inset 0 0 40px rgba(0,0,0,.3);
+            user-select:none;
+            cursor:grab;
+        }
+        main.canvas.panning{cursor:grabbing}
+        /* Inner content sizer — grown in JS so both scrollbars always have
+           room to scroll left/right and up/down around whatever nodes exist,
+           and so it grows/shrinks correctly as the zoom level changes. */
+        #canvasInner{
+            position:relative;
+        }
+        .node{
+            position:absolute;
+            width:var(--node-size);height:var(--node-size);
+            display:flex;flex-direction:column;align-items:center;justify-content:center;
+            text-align:center;
+            background:linear-gradient(180deg,var(--panel-2),var(--panel));
+            border:1px solid var(--line);
+            border-radius:10px;
+            cursor:grab;
+            box-shadow:var(--shadow);
+            transition:border-color .15s,box-shadow .15s;
+            padding:4px;
+            overflow:hidden;
+            z-index:2;
+        }
+        .node.dragging{cursor:grabbing;z-index:20;opacity:.85;transition:none}
+        .node:hover{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold-soft),var(--shadow);z-index:5}
+        .node b{
+            display:block;font-size:9.5px;font-weight:600;line-height:1.15;color:var(--text);
+            overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+            pointer-events:none;
+        }
+        .node.start{
+            border-color:var(--gold);
+            background:linear-gradient(180deg,#2a2313,var(--panel));
+            box-shadow:0 0 0 1px var(--gold-soft),var(--shadow);
+        }
+        .node.start b{color:var(--gold)}
+        .node small.sub{
+            display:block;font-size:7.5px;font-weight:600;letter-spacing:.03em;
+            color:#c9a6f0;text-transform:uppercase;margin-top:2px;
+            pointer-events:none;
+        }
+        .node.start::before{
+            content:'★';
+            position:absolute;top:-8px;left:50%;transform:translateX(-50%);
+            font-size:11px;color:#1a1206;
+            background:var(--gold);
+            width:16px;height:16px;border-radius:50%;
+            display:flex;align-items:center;justify-content:center;
+            pointer-events:none;
+        }
+        .port{
+            position:absolute;width:12px;height:12px;border-radius:50%;
+            background:var(--gold);border:2px solid var(--bg);
+            opacity:0;transform:scale(.5);
+            cursor:crosshair;
+            transition:opacity .12s,transform .12s,background .12s;
+            box-shadow:0 0 6px var(--gold-soft);
+            z-index:6;
+        }
+        .node:hover .port{opacity:1;transform:scale(1)}
+        .port:hover{background:#fff;box-shadow:0 0 14px var(--gold);transform:scale(1.6)!important}
+        .port.r{right:-6px;top:50%;margin-top:-6px}
+        .port.l{left:-6px;top:50%;margin-top:-6px}
+        .port.t{top:-6px;left:50%;margin-left:-6px}
+        .port.b{bottom:-6px;left:50%;margin-left:-6px}
+
+        #svg path.dep{transition:stroke .15s}
+
+        .panel{
+            position:fixed;top:0;right:0;bottom:0;width:320px;
+            background:var(--panel);
+            border-left:1px solid var(--line);
+            padding:22px;
+            box-shadow:-12px 0 30px rgba(0,0,0,.35);
+            overflow-y:auto;
+            z-index:10;
+        }
+        .panel h3{
+            font:600 16px 'Cinzel',serif;color:var(--gold);
+            margin:0 0 18px;padding-bottom:10px;border-bottom:1px solid var(--line);
+        }
+        .panel label{
+            display:block;margin:14px 0 4px;
+            font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);
+        }
+        .panel input,.panel textarea{
+            width:100%;background:var(--panel-2);color:var(--text);
+            border:1px solid var(--line);border-radius:6px;padding:8px 10px;
+            font:400 13px 'Inter',sans-serif;
+        }
+        .panel textarea{height:70px;resize:vertical;font-family:'JetBrains Mono',monospace;font-size:12px}
+        .panel input[type=checkbox]{width:auto;margin-right:8px;vertical-align:middle}
+        .panel button{width:100%;margin-top:18px}
+        .panel .nodeid{font:400 11px 'JetBrains Mono',monospace;color:var(--muted);margin-top:-14px;margin-bottom:10px}
+
+        #toast{
+            position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);
+            background:var(--bad);color:#fff;padding:10px 18px;border-radius:8px;
+            font-size:13px;font-weight:500;box-shadow:var(--shadow);
+            opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;
+            z-index:100;
+        }
+        #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+    </style>
+</head>
+<body>
+
+<header>
+    <h2>Skill Tree Editor</h2>
+    <span id="status">Connecting…</span>
+    <div class="bar">
+        <select id="tree">
+            <option value="water">Water</option>
+            <option value="earth">Earth</option>
+            <option value="fire">Fire</option>
+            <option value="air">Air</option>
+            <option value="chi">Chi</option>
+            <option value="avatar">Avatar</option>
+        </select>
+        <button id="add">+ Add node</button>
+        <button id="reload" class="primary">Reload</button>
+        <span class="zoombar">
+            <button id="zoomOut" title="Zoom out">−</button>
+            <span id="zoomLabel">100%</span>
+            <button id="zoomIn" title="Zoom in">+</button>
+            <button id="zoomReset" title="Reset zoom">Reset</button>
+        </span>
+        <span class="panbar">
+            <button id="panLeft" title="Scroll left">◀</button>
+            <button id="panUp" title="Scroll up">▲</button>
+            <button id="panDown" title="Scroll down">▼</button>
+            <button id="panRight" title="Scroll right">▶</button>
+        </span>
+    </div>
+</header>
+
+<p class="hint">Drag a node's <b>body</b> to move it between fixed slots (the START node can be dragged too — drag it to the center and build outward around it). Hover a node to reveal its four gold ports; <b>click a port</b> to start a dependency line, then click the target node to finish it. Dependencies only connect to the <b>slot directly above, below, left, or right</b> — not diagonally. Scroll/drag the canvas to pan, or use the ◀▲▼▶ buttons. Hold <b>Ctrl</b> + scroll wheel, or use the +/− buttons, to zoom.</p>
+
+<main id="canvas" class="canvas"></main>
+
+<section id="panel" class="panel" hidden>
+    <h3 id="title"></h3>
+    <div class="nodeid" id="nodeid"></div>
+    <label>Lore</label>
+    <textarea id="lore"></textarea>
+    <label>XP</label>
+    <input id="xp" type="number">
+    <label>Playtime</label>
+    <input id="playtime" type="number">
+    <label>Kills</label>
+    <input id="kills" type="number">
+    <label style="text-transform:none;font-size:13px;margin-top:18px">
+        <input id="start" type="checkbox"> Mark as START node
+    </label>
+    <button id="save" class="primary">Save</button>
+</section>
+
+<div id="toast"></div>
+
+<script>
+    const q=s=>document.querySelector(s),canvas=q('#canvas'),tree=q('#tree'),status=q('#status'),toastEl=q('#toast');
+    let nodes=[],active,linking=null; // linking = {fromNode} when a dependency line is being drawn via click-click
+
+    // ── Zoom ──────────────────────────────────────────────────────────────────
+    // Base (100%) slot/node sizes. SLOT_W/SLOT_H/NODE are recomputed from these
+    // whenever the zoom level changes, and everything (node positions, node
+    // pixel size, dependency lines) is redrawn against the new values.
+    const BASE_SLOT_W=200,BASE_SLOT_H=130,BASE_NODE=64;
+    let zoom=1, SLOT_W=BASE_SLOT_W, SLOT_H=BASE_SLOT_H, NODE=BASE_NODE;
+    const ZOOM_MIN=0.4, ZOOM_MAX=2.2, ZOOM_STEP=0.15;
+
+    const TREE_COLOR={water:'#4fa3d9',earth:'#7a9459',fire:'#d9683f',air:'#c9d9c0',chi:'#a06fd9',avatar:'#d9a94e'};
+
+    function slotCenter(n){ return {cx:n.x*SLOT_W+SLOT_W/2, cy:n.y*SLOT_H+SLOT_H/2}; }
+
+    function applyZoom(newZoom, opts){
+        opts=opts||{};
+        let old=zoom;
+        zoom=Math.min(ZOOM_MAX,Math.max(ZOOM_MIN,newZoom));
+        SLOT_W=BASE_SLOT_W*zoom; SLOT_H=BASE_SLOT_H*zoom; NODE=BASE_NODE*zoom;
+        canvas.style.setProperty('--node-size',NODE+'px');
+        canvas.style.setProperty('--slot-w',SLOT_W+'px');
+        canvas.style.setProperty('--slot-h',SLOT_H+'px');
+        q('#zoomLabel').textContent=Math.round(zoom*100)+'%';
+
+        // Keep whatever point is under the cursor (or the viewport center, if
+        // none given) visually anchored while the scale changes, so zooming
+        // feels like it's happening "into" the content rather than snapping
+        // the scroll position back to the top-left corner.
+        if(old!==zoom){
+            let anchorX=opts.clientX!=null?opts.clientX-canvas.getBoundingClientRect().left:canvas.clientWidth/2;
+            let anchorY=opts.clientY!=null?opts.clientY-canvas.getBoundingClientRect().top:canvas.clientHeight/2;
+            let ratio=zoom/old;
+            let contentX=canvas.scrollLeft+anchorX, contentY=canvas.scrollTop+anchorY;
+            canvas.scrollLeft=contentX*ratio-anchorX;
+            canvas.scrollTop=contentY*ratio-anchorY;
+        }
+        redraw();
+    }
+
+    function sizeCanvasInner(){
+        // Grow the inner sizer element so there's always scrollable room in
+        // every direction (left/right/up/down), regardless of zoom level.
+        let maxX=0,maxY=0;
+        nodes.forEach(n=>{ maxX=Math.max(maxX,n.x); maxY=Math.max(maxY,n.y); });
+        let padSlots=6; // extra empty slots of breathing room around the tree
+        let w=Math.max((maxX+1+padSlots)*SLOT_W, canvas.clientWidth*1.5);
+        let h=Math.max((maxY+1+padSlots)*SLOT_H, canvas.clientHeight*1.5);
+        let inner=q('#canvasInner');
+        if(inner){ inner.style.width=w+'px'; inner.style.height=h+'px'; }
+    }
+
+    function toast(msg){
+        toastEl.textContent=msg;
+        toastEl.classList.add('show');
+        clearTimeout(toastEl._t);
+        toastEl._t=setTimeout(()=>toastEl.classList.remove('show'),2200);
+    }
+
+    function isOrthoAdjacent(a,b){
+        let dx=Math.abs(a.x-b.x), dy=Math.abs(a.y-b.y);
+        return (dx===1&&dy===0) || (dx===0&&dy===1);
+    }
+
+    async function load(){
+        try{
+            let r=await fetch('/api/nodes?tree='+tree.value);
+            nodes=await r.json();
+            status.textContent='Connected to localhost:67';
+            status.classList.add('ok');
+            linking=null;
+            redraw();
+        }catch{
+            status.textContent='Start AvatarLegacy to connect';
+            status.classList.remove('ok');
+        }
+    }
+
+    // Re-renders the current `nodes` array at the current zoom level, without
+    // re-fetching from the server. Used after zoom/pan changes and after any
+    // in-place edit so scroll position (mostly) survives.
+    function redraw(){
+        let color=TREE_COLOR[tree.value]||'#d9a94e';
+        canvas.innerHTML=`<div id="canvasInner">
+      <svg id="svg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible">
+        <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="${color}"/>
+        </marker></defs>
+      </svg>
+    </div>`;
+        sizeCanvasInner();
+        nodes.forEach(draw);
+        lines();
+    }
+
+    function lines(){
+        let s=q('#svg'),color=TREE_COLOR[tree.value]||'#d9a94e';
+        nodes.forEach(n=>(n.dependencies||[]).forEach(id=>{
+            let p=nodes.find(x=>x.nodeId===id);
+            if(p){
+                let a=slotCenter(p),b=slotCenter(n);
+                let dx=b.cx-a.cx,dy=b.cy-a.cy,dist=Math.hypot(dx,dy)||1;
+                let ux=dx/dist,uy=dy/dist,r=NODE/2+4;
+                let x1=a.cx+ux*r,y1=a.cy+uy*r,x2=b.cx-ux*(r+6),y2=b.cy-uy*(r+6);
+                let mx=(x1+x2)/2,my=(y1+y2)/2;
+                s.innerHTML+=`<path class="dep" d="M${x1},${y1} Q${mx},${my} ${x2},${y2}" fill="none" stroke="${color}" stroke-width="2" opacity="0.9" marker-end="url(#arrow)"/>`;
+            }
+        }));
+    }
+
+    function draw(n){
+        let c=slotCenter(n);
+        let e=document.createElement('article');
+        e.className='node '+(n.isDefault?'start':'');
+        e.dataset.id=n.nodeId;
+        e.style.left=(c.cx-NODE/2)+'px';
+        e.style.top=(c.cy-NODE/2)+'px';
+        e.innerHTML=`<b>${n.ability}</b>${n.subelement?`<small class="sub">${n.subelement}</small>`:''}
+    <i class="port r" data-dir="r"></i>
+    <i class="port l" data-dir="l"></i>
+    <i class="port t" data-dir="t"></i>
+    <i class="port b" data-dir="b"></i>`;
+
+        // --- click to open edit panel, or finish a pending dependency link ---
+        e.onclick=ev=>{
+            if(ev.target.classList.contains('port')) return; // handled by port click
+            if(linking && linking.from!==n){
+                tryLink(linking.from, n);
+                linking=null;
+                return;
+            }
+            edit(n);
+        };
+
+        // --- drag node body to move between slots ---
+        let dragging=false, startX,startY, origLeft,origTop, moved=false;
+        e.onpointerdown=ev=>{
+            if(ev.target.classList.contains('port')) return;
+            dragging=true; moved=false;
+            startX=ev.clientX; startY=ev.clientY;
+            origLeft=e.offsetLeft; origTop=e.offsetTop;
+            e.setPointerCapture(ev.pointerId);
+            e.classList.add('dragging');
+        };
+        e.onpointermove=ev=>{
+            if(!dragging) return;
+            let dx=ev.clientX-startX, dy=ev.clientY-startY;
+            if(Math.abs(dx)>4||Math.abs(dy)>4) moved=true;
+            e.style.left=(origLeft+dx)+'px';
+            e.style.top=(origTop+dy)+'px';
+        };
+        e.onpointerup=ev=>{
+            if(!dragging) return;
+            dragging=false;
+            e.classList.remove('dragging');
+            if(moved){
+                // snap to nearest slot based on node's current top-left, converted back to slot coords
+                let left=e.offsetLeft+NODE/2, top=e.offsetTop+NODE/2;
+                let gx=Math.round((left-SLOT_W/2)/SLOT_W);
+                let gy=Math.round((top-SLOT_H/2)/SLOT_H);
+                gx=Math.max(0,gx); gy=Math.max(0,gy);
+                let occupied=nodes.find(x=>x!==n && x.x===gx && x.y===gy);
+                if(occupied){
+                    toast('That slot is already occupied.');
+                    load();
+                    return;
+                }
+                n.x=gx; n.y=gy;
+                saveNode(n).then(load);
+            }
+        };
+
+        // --- ports: click to start, click target node to finish ---
+        e.querySelectorAll('.port').forEach(port=>{
+            port.onclick=ev=>{
+                ev.stopPropagation();
+                linking={from:n};
+                toast('Click the target node to link (must be directly adjacent).');
+            };
+        });
+
+        (q('#canvasInner')||canvas).append(e);
+    }
+
+    function tryLink(fromNode, toNode){
+        if(fromNode===toNode) return;
+        if(!isOrthoAdjacent(fromNode,toNode)){
+            toast('Dependencies can only connect to the slot directly above, below, left, or right — not diagonal.');
+            return;
+        }
+        toNode.dependencies=[...new Set([...(toNode.dependencies||[]),fromNode.nodeId])];
+        saveNode(toNode).then(load);
+    }
+
+    function edit(n){
+        active=n;
+        q('#panel').hidden=false;
+        q('#title').textContent=n.ability;
+        q('#nodeid').textContent=n.nodeId;
+        q('#lore').value=(n.lore||[]).join('\n');
+        q('#xp').value=n.xp;
+        q('#playtime').value=n.playtime;
+        q('#kills').value=n.kills;
+        q('#start').checked=n.isDefault;
+    }
+
+    async function saveNode(n){
+        return fetch('/api/nodes/'+n.tree+'/'+n.nodeId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(n)});
+    }
+
+    q('#save').onclick=()=>{
+        active.lore=q('#lore').value.split('\n');
+        active.xp=+q('#xp').value;
+        active.playtime=+q('#playtime').value;
+        active.kills=+q('#kills').value;
+        active.isDefault=q('#start').checked;
+        saveNode(active).then(load);
+    };
+
+    tree.onchange=load;
+    q('#reload').onclick=()=>fetch('/api/reload',{method:'POST'}).then(load);
+    q('#add').onclick=()=>{
+        let ability=prompt('Ability'),nodeId=prompt('Node ID');
+        if(ability&&nodeId)fetch('/api/nodes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tree:tree.value,ability,nodeId})}).then(load);
+    };
+
+    // ── Zoom controls ────────────────────────────────────────────────────────
+    q('#zoomIn').onclick   = ()=>applyZoom(zoom+ZOOM_STEP);
+    q('#zoomOut').onclick  = ()=>applyZoom(zoom-ZOOM_STEP);
+    q('#zoomReset').onclick= ()=>applyZoom(1);
+
+    // Ctrl/Cmd + mouse wheel to zoom in/out, anchored under the cursor.
+    canvas.addEventListener('wheel',ev=>{
+        if(!(ev.ctrlKey||ev.metaKey)) return; // plain wheel = normal scroll (left/right with shift, up/down otherwise)
+        ev.preventDefault();
+        let dir=ev.deltaY>0?-1:1;
+        applyZoom(zoom+dir*ZOOM_STEP,{clientX:ev.clientX,clientY:ev.clientY});
+    },{passive:false});
+
+    // ── Pan controls (buttons) ───────────────────────────────────────────────
+    const PAN_STEP=160;
+    q('#panLeft').onclick =()=>canvas.scrollBy({left:-PAN_STEP,behavior:'smooth'});
+    q('#panRight').onclick=()=>canvas.scrollBy({left: PAN_STEP,behavior:'smooth'});
+    q('#panUp').onclick   =()=>canvas.scrollBy({top:-PAN_STEP,behavior:'smooth'});
+    q('#panDown').onclick =()=>canvas.scrollBy({top: PAN_STEP,behavior:'smooth'});
+
+    // ── Pan by click-dragging empty canvas space (middle-drag / space-drag feel) ─
+    let panning=false,panStartX,panStartY,panScrollLeft,panScrollTop;
+    canvas.addEventListener('pointerdown',ev=>{
+        if(ev.target.closest('.node')||ev.target.closest('.port')) return; // let node drag/link logic own this
+        panning=true;
+        panStartX=ev.clientX; panStartY=ev.clientY;
+        panScrollLeft=canvas.scrollLeft; panScrollTop=canvas.scrollTop;
+        canvas.classList.add('panning');
+        canvas.setPointerCapture(ev.pointerId);
+    });
+    canvas.addEventListener('pointermove',ev=>{
+        if(!panning) return;
+        canvas.scrollLeft=panScrollLeft-(ev.clientX-panStartX);
+        canvas.scrollTop =panScrollTop -(ev.clientY-panStartY);
+    });
+    ['pointerup','pointercancel','pointerleave'].forEach(evt=>
+        canvas.addEventListener(evt,()=>{ panning=false; canvas.classList.remove('panning'); }));
+
+    applyZoom(1);
+    load();
+</script>
+</body>
+</html>

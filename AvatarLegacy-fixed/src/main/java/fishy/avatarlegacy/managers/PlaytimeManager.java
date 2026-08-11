@@ -42,8 +42,7 @@ public class PlaytimeManager {
             long currentIntervals  = data.getPlaytimeSeconds() / intervalSeconds;
 
             if (currentIntervals > previousIntervals) {
-                int xpPerInterval = plugin.getConfig().getInt("custom-xp.per-playtime-interval", 5);
-                data.addCustomXP(xpPerInterval);
+                plugin.getStatsManager().awardConfiguredXp(player.getUniqueId(), "playtime", 1);
             }
         }
     }
