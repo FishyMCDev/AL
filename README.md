@@ -6,23 +6,6 @@ For further docs: https://avatarlegacy.net
 Discord: https://discord.com/invite/dPDXV77AMQ
 
 
-## Stuff you must read about
-
-1. Connecting
-2. Bending
-3. Skill Trees
-4. Statistics
-5. The Avatar
-6. Nations
-7. Economy
-8. PvP
-9. Farming and Jobs
-10. Brewing
-11. Seasons
-12. Mobs and Items
-13. Getting Started Checklist
-14. Links
-
 ## 1. Connecting
 
 Connect to the server on Minecraft Java Edition, using the ip `avatarlegacy.skailarhost.com`. Bedrock is supported, look to the stardance "Try this project" page for further support.
