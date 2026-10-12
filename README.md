@@ -60,7 +60,7 @@ Found and grow your own nation.
 - `/server PvP` accesses the dedicated PvP server, where you can fight without risking your main progress
 - `/duel <player>` starts a 1v1, `/ffa` joins a free-for-all arena, and `/leave` or `/ffa leave` exits
 
-## 11. Seasons
+## 9. Seasons
 
 The server cycles through four seasons, tracked with `/season`, which affect crop growth, personal temperature and mob spawns. Watch your temperature indicator and stay near a comfortable range to avoid freezing or overheating.
 
@@ -73,9 +73,4 @@ Celestial events periodically buff or nerf specific elements:
 - Solar Eclipse blocks Firebending
 - Lunar Eclipse blocks Waterbending
 
-
-## 14. Links
-
-- Wiki: https://avatarlegacy.net
-- Discord: https://discord.com/invite/dPDXV77AMQ
 
